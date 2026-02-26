@@ -119,7 +119,7 @@ function Dashboard() {
           No
         </button>
       </div>
-    ), { duration: 8000 });
+    ), { duration: 8000, style: { pointerEvents: 'auto' } });
   });
 
   const cerrarSesion = async () => {

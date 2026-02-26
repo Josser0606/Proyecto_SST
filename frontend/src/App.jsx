@@ -20,7 +20,8 @@ function App() {
             background: '#ffffff',
             color: '#0f172a',
             boxShadow: '0 10px 30px rgba(20, 83, 45, 0.16)',
-            fontWeight: 700
+            fontWeight: 700,
+            pointerEvents: 'none'
           },
           success: {
             style: { border: '1px solid #86efac' }
