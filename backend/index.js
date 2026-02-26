@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+const { v2: cloudinary } = require('cloudinary');
 const db = require('./db');
 const iniciarTareas = require('./tareas');
 
@@ -14,6 +15,24 @@ const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL ||
   .map((o) => o.trim())
   .filter(Boolean);
 const allowVercelPreview = process.env.ALLOW_VERCEL_PREVIEW === 'true';
+const useCloudinary = Boolean(
+  process.env.CLOUDINARY_URL ||
+  (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+);
+const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
+
+if (useCloudinary) {
+  if (process.env.CLOUDINARY_URL) {
+    cloudinary.config({ secure: true });
+  } else {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure: true
+    });
+  }
+}
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -60,16 +79,73 @@ const parseJsonArray = (value) => {
   }
 };
 
-const deleteFileSafe = (fileUrl) => {
-  if (!fileUrl || typeof fileUrl !== 'string' || !fileUrl.startsWith('/uploads/')) return;
-  const fullPath = path.join(__dirname, fileUrl.replace('/uploads/', 'uploads/'));
-  if (fs.existsSync(fullPath)) {
+const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
+
+const getCloudinaryResourceType = (url) => {
+  if (url.includes('/raw/upload/')) return 'raw';
+  if (url.includes('/video/upload/')) return 'video';
+  return 'image';
+};
+
+const getCloudinaryPublicId = (url) => {
+  try {
+    const { pathname } = new URL(url);
+    const match = pathname.match(/\/(?:image|raw|video)\/upload\/(?:v\d+\/)?(.+)$/);
+    if (!match || !match[1]) return null;
+    const lastDot = match[1].lastIndexOf('.');
+    return lastDot > -1 ? match[1].slice(0, lastDot) : match[1];
+  } catch {
+    return null;
+  }
+};
+
+const deleteFileSafe = async (fileUrl) => {
+  if (!fileUrl || typeof fileUrl !== 'string') return;
+
+  if (fileUrl.startsWith('/uploads/')) {
+    const fullPath = path.join(__dirname, fileUrl.replace('/uploads/', 'uploads/'));
+    if (fs.existsSync(fullPath)) {
+      try {
+        fs.unlinkSync(fullPath);
+      } catch {
+        // ignore unlink errors
+      }
+    }
+    return;
+  }
+
+  if (useCloudinary && isCloudinaryUrl(fileUrl)) {
+    const publicId = getCloudinaryPublicId(fileUrl);
+    if (!publicId) return;
     try {
-      fs.unlinkSync(fullPath);
+      await cloudinary.uploader.destroy(publicId, { resource_type: getCloudinaryResourceType(fileUrl) });
     } catch {
-      // ignore unlink errors
+      // ignore cloudinary delete errors
     }
   }
+};
+
+const uploadStoredFile = async (file, tipo) => {
+  if (!file) return null;
+  if (!useCloudinary) {
+    return { url: `/uploads/${file.filename}` };
+  }
+
+  const resource_type = tipo === 'archivo' ? 'raw' : 'image';
+  const uploaded = await cloudinary.uploader.upload(file.path, {
+    folder: cloudinaryFolder,
+    resource_type
+  });
+
+  if (file.path && fs.existsSync(file.path)) {
+    try {
+      fs.unlinkSync(file.path);
+    } catch {
+      // ignore local cleanup errors
+    }
+  }
+
+  return { url: uploaded.secure_url };
 };
 
 const initSchema = async () => {
@@ -276,15 +352,17 @@ app.post('/api/publicaciones', upload.fields([{ name: 'imagen', maxCount: 1 }, {
   let imagen_url = null;
   let imagenesParaRecursos = [];
 
-  if (imagen) {
-    imagen_url = `/uploads/${imagen.filename}`;
-    imagenesParaRecursos = imagenesNuevas;
-  } else if (imagenesNuevas.length > 0) {
-    imagen_url = `/uploads/${imagenesNuevas[0].filename}`;
-    imagenesParaRecursos = imagenesNuevas.slice(1);
-  }
-
   try {
+    if (imagen) {
+      const subido = await uploadStoredFile(imagen, 'imagen');
+      imagen_url = subido?.url || null;
+      imagenesParaRecursos = imagenesNuevas;
+    } else if (imagenesNuevas.length > 0) {
+      const subido = await uploadStoredFile(imagenesNuevas[0], 'imagen');
+      imagen_url = subido?.url || null;
+      imagenesParaRecursos = imagenesNuevas.slice(1);
+    }
+
     const [result] = await db.query(
       'INSERT INTO publicaciones (titulo, contenido, categoria, autor_id, imagen_url) VALUES (?, ?, ?, ?, ?)',
       [titulo, contenido, categoria, id_autor, imagen_url]
@@ -292,16 +370,18 @@ app.post('/api/publicaciones', upload.fields([{ name: 'imagen', maxCount: 1 }, {
     const publicacionId = result.insertId;
 
     for (const archivo of archivos) {
+      const subido = await uploadStoredFile(archivo, 'archivo');
       await db.query(
         'INSERT INTO publicacion_recursos (publicacion_id, tipo, nombre, url) VALUES (?, ?, ?, ?)',
-        [publicacionId, 'archivo', archivo.originalname, `/uploads/${archivo.filename}`]
+        [publicacionId, 'archivo', archivo.originalname, subido?.url]
       );
     }
 
     for (const imagenExtra of imagenesParaRecursos) {
+      const subido = await uploadStoredFile(imagenExtra, 'imagen');
       await db.query(
         'INSERT INTO publicacion_recursos (publicacion_id, tipo, nombre, url) VALUES (?, ?, ?, ?)',
-        [publicacionId, 'imagen', imagenExtra.originalname, `/uploads/${imagenExtra.filename}`]
+        [publicacionId, 'imagen', imagenExtra.originalname, subido?.url]
       );
     }
 
@@ -337,13 +417,15 @@ app.put('/api/publicaciones/:id', upload.fields([{ name: 'imagen', maxCount: 1 }
     let imagenesParaRecursos = imagenesNuevas;
 
     if (imagenNueva) {
-      if (pubRows[0].imagen_url) deleteFileSafe(pubRows[0].imagen_url);
-      imagenPrincipalActual = `/uploads/${imagenNueva.filename}`;
+      if (pubRows[0].imagen_url) await deleteFileSafe(pubRows[0].imagen_url);
+      const subido = await uploadStoredFile(imagenNueva, 'imagen');
+      imagenPrincipalActual = subido?.url || null;
       await db.query('UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ?, imagen_url = ? WHERE id = ?', [titulo, contenido, categoria, imagenPrincipalActual, id]);
     } else {
       await db.query('UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ? WHERE id = ?', [titulo, contenido, categoria, id]);
       if (!imagenPrincipalActual && imagenesNuevas.length > 0) {
-        imagenPrincipalActual = `/uploads/${imagenesNuevas[0].filename}`;
+        const subido = await uploadStoredFile(imagenesNuevas[0], 'imagen');
+        imagenPrincipalActual = subido?.url || null;
         await db.query('UPDATE publicaciones SET imagen_url = ? WHERE id = ?', [imagenPrincipalActual, id]);
         imagenesParaRecursos = imagenesNuevas.slice(1);
       }
@@ -352,21 +434,23 @@ app.put('/api/publicaciones/:id', upload.fields([{ name: 'imagen', maxCount: 1 }
     const [recursosActuales] = await db.query('SELECT id, tipo, url FROM publicacion_recursos WHERE publicacion_id = ?', [id]);
     const eliminar = recursosActuales.filter((r) => !recursosExistentes.includes(r.id));
     for (const r of eliminar) {
-      if (r.tipo === 'archivo' || r.tipo === 'imagen') deleteFileSafe(r.url);
+      if (r.tipo === 'archivo' || r.tipo === 'imagen') await deleteFileSafe(r.url);
       await db.query('DELETE FROM publicacion_recursos WHERE id = ?', [r.id]);
     }
 
     for (const archivo of archivosNuevos) {
+      const subido = await uploadStoredFile(archivo, 'archivo');
       await db.query(
         'INSERT INTO publicacion_recursos (publicacion_id, tipo, nombre, url) VALUES (?, ?, ?, ?)',
-        [id, 'archivo', archivo.originalname, `/uploads/${archivo.filename}`]
+        [id, 'archivo', archivo.originalname, subido?.url]
       );
     }
 
     for (const imagenExtra of imagenesParaRecursos) {
+      const subido = await uploadStoredFile(imagenExtra, 'imagen');
       await db.query(
         'INSERT INTO publicacion_recursos (publicacion_id, tipo, nombre, url) VALUES (?, ?, ?, ?)',
-        [id, 'imagen', imagenExtra.originalname, `/uploads/${imagenExtra.filename}`]
+        [id, 'imagen', imagenExtra.originalname, subido?.url]
       );
     }
 
@@ -390,8 +474,10 @@ app.delete('/api/publicaciones/:id', async (req, res) => {
   try {
     const [pubRows] = await db.query('SELECT imagen_url FROM publicaciones WHERE id = ?', [id]);
     const [recursos] = await db.query('SELECT tipo, url FROM publicacion_recursos WHERE publicacion_id = ?', [id]);
-    recursos.forEach((r) => { if (r.tipo === 'archivo' || r.tipo === 'imagen') deleteFileSafe(r.url); });
-    if (pubRows[0]?.imagen_url) deleteFileSafe(pubRows[0].imagen_url);
+    for (const r of recursos) {
+      if (r.tipo === 'archivo' || r.tipo === 'imagen') await deleteFileSafe(r.url);
+    }
+    if (pubRows[0]?.imagen_url) await deleteFileSafe(pubRows[0].imagen_url);
 
     await db.query('DELETE FROM publicacion_recursos WHERE publicacion_id = ?', [id]);
     await db.query('UPDATE publicaciones SET eliminada = 1, imagen_url = NULL WHERE id = ?', [id]);
