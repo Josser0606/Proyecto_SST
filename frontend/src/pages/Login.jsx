@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
@@ -13,6 +13,10 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false); // Estado para el modal
   const navigate = useNavigate();
+
+  useEffect(() => {
+    toast.dismiss();
+  }, []);
 
   // Función que se dispara al dar clic en el botón del formulario
   const handlePreLogin = (e) => {
