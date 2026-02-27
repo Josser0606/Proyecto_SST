@@ -145,7 +145,19 @@ const uploadStoredFile = async (file, tipo) => {
     }
   }
 
-  return { url: uploaded.secure_url };
+  if (tipo === 'archivo') {
+    return { url: uploaded.secure_url };
+  }
+
+  // Entrega imagen en formato compatible segun navegador (evita fallos con HEIC/HEIF en desktop).
+  const optimizedImageUrl = cloudinary.url(uploaded.public_id, {
+    secure: true,
+    resource_type: 'image',
+    fetch_format: 'auto',
+    quality: 'auto'
+  });
+
+  return { url: optimizedImageUrl || uploaded.secure_url };
 };
 
 const initSchema = async () => {
