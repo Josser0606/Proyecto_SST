@@ -438,14 +438,14 @@ function Reportes() {
           </button>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 sm:mb-10 gap-4 sm:gap-6">
-          <div>
-            <h1 className={`text-2xl sm:text-4xl font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>Auditoria de Lectura</h1>
+        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-6 sm:mb-10 gap-4 sm:gap-6">
+          <div className="min-w-0">
+            <h1 className={`text-2xl sm:text-4xl 2xl:text-[2.8rem] leading-[1] font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>Auditoria de Lectura</h1>
             <p className={`${darkMode ? 'text-slate-400' : 'text-gray-500'} font-medium`}>Historico de lecturas por cominicado</p>
           </div>
 
-          <div className="flex flex-wrap gap-3 w-full md:w-auto">
-            <div className="relative w-full md:w-80">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px]">
+            <div className="relative w-full min-w-0">
               <svg className={`w-5 h-5 absolute left-3 top-3 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
               </svg>
@@ -463,7 +463,7 @@ function Reportes() {
             <select
               value={formatoExportacion}
               onChange={(e) => setFormatoExportacion(e.target.value)}
-              className={`w-full sm:w-auto px-4 py-3 rounded-2xl border font-semibold text-sm ${
+              className={`w-full px-4 py-3 rounded-2xl border font-semibold text-sm ${
                 darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-gray-200 bg-white'
               }`}
             >
@@ -475,7 +475,7 @@ function Reportes() {
             <button
               onClick={exportarInformacion}
               disabled={datosFiltrados.length === 0}
-              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-6 py-3 rounded-2xl font-bold shadow-lg  flex items-center justify-center gap-2 transition-all active:scale-95"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-6 py-3 rounded-2xl font-bold shadow-lg  flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>

@@ -1,5 +1,8 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Admin from './pages/Admin';
@@ -7,9 +10,53 @@ import RegistroEmpleado from './pages/RegistroEmpleado';
 import AdminPanel from './pages/AdminPanel';
 import Reportes from './pages/Reportes';
 
+const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
+
+function SessionInactivityGuard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === '/') return undefined;
+    if (!localStorage.getItem('usuario')) return undefined;
+
+    let timeoutId;
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        if (!localStorage.getItem('usuario')) return;
+        toast.dismiss();
+        localStorage.removeItem('usuario');
+        toast.error('Sesion cerrada por inactividad');
+        navigate('/', { replace: true });
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resetTimer();
+      }
+    };
+
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'focus'];
+    events.forEach((eventName) => window.addEventListener(eventName, resetTimer, { passive: true }));
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    resetTimer();
+
+    return () => {
+      events.forEach((eventName) => window.removeEventListener(eventName, resetTimer));
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <SessionInactivityGuard />
       <Toaster
         position="top-right"
         toastOptions={{
