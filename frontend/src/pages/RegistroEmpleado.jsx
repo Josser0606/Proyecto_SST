@@ -20,7 +20,9 @@ const BASE_FORM = {
   nombre_completo: '',
   area: 'SST y GH',
   rol: 'empleado',
-  password: ''
+  password: '',
+  email: '',
+  notificar_email: true
 };
 
 function RegistroEmpleado() {
@@ -71,6 +73,10 @@ function RegistroEmpleado() {
       toast.error('Un admin nuevo requiere contrasena');
       return false;
     }
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast.error('Correo electronico invalido');
+      return false;
+    }
     return true;
   };
 
@@ -83,7 +89,9 @@ function RegistroEmpleado() {
       const payload = {
         nombre_completo: formData.nombre_completo.trim(),
         area: formData.area,
-        rol: formData.rol
+        rol: formData.rol,
+        email: formData.email.trim() || null,
+        notificar_email: Boolean(formData.notificar_email)
       };
 
       if (formData.rol === 'admin' && formData.password.trim()) {
@@ -115,7 +123,9 @@ function RegistroEmpleado() {
       nombre_completo: usuario.nombre_completo,
       area: usuario.area,
       rol: usuario.rol,
-      password: ''
+      password: '',
+      email: usuario.email || '',
+      notificar_email: Boolean(usuario.notificar_email)
     });
     window.requestAnimationFrame(() => {
       if (formRef.current) {
@@ -176,7 +186,8 @@ function RegistroEmpleado() {
       return (
         (u.nombre_completo || '').toLowerCase().includes(term) ||
         (u.area || '').toLowerCase().includes(term) ||
-        (u.rol || '').toLowerCase().includes(term)
+        (u.rol || '').toLowerCase().includes(term) ||
+        (u.email || '').toLowerCase().includes(term)
       );
     });
   }, [usuarios, filtro]);
@@ -405,6 +416,33 @@ function RegistroEmpleado() {
               </select>
             </div>
 
+            <div>
+              <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Correo electronico</label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 font-medium ${
+                  darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white text-slate-700'
+                }`}
+                placeholder="ejemplo@fundacionsaciar.org"
+              />
+            </div>
+
+            <label className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer ${
+              darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-gray-200 bg-gray-50'
+            }`}>
+              <input
+                type="checkbox"
+                checked={Boolean(formData.notificar_email)}
+                onChange={(e) => setFormData({ ...formData, notificar_email: e.target.checked })}
+                className="cursor-pointer"
+              />
+              <span className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                Recibir notificaciones por correo
+              </span>
+            </label>
+
             {formData.rol === 'admin' && (
               <div>
                 <label className={`block text-xs font-bold uppercase tracking-widest mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -451,7 +489,7 @@ function RegistroEmpleado() {
               <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                 <div>
                   <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area o rol.</p>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
                 </div>
 
                 <div className="w-full lg:w-[360px]">
@@ -461,7 +499,7 @@ function RegistroEmpleado() {
                       type="text"
                       value={filtro}
                       onChange={(e) => setFiltro(e.target.value)}
-                      placeholder="Nombre, area o rol"
+                      placeholder="Nombre, area, rol o correo"
                       className={`flex-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 text-sm ${
                         darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white'
                       }`}
@@ -496,6 +534,11 @@ function RegistroEmpleado() {
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold border max-w-full ${
+                        darkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'
+                      }`}>
+                        {u.email || 'Sin correo'}
+                      </span>
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
                         darkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'
                       }`}>
@@ -505,6 +548,11 @@ function RegistroEmpleado() {
                         u.rol === 'admin' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
                       }`}>
                         {u.rol}
+                      </span>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
+                        Boolean(u.notificar_email) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {Boolean(u.notificar_email) ? 'Email on' : 'Email off'}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -562,6 +610,7 @@ function RegistroEmpleado() {
                         <div className="min-w-0">
                           <p className={`font-semibold leading-tight truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{u.nombre_completo}</p>
                           <p className={`text-[10px] uppercase tracking-wide ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>ID: EMP-{u.id}</p>
+                          <p className={`text-[11px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{u.email || 'Sin correo'}</p>
                         </div>
                       </div>
 
@@ -581,6 +630,13 @@ function RegistroEmpleado() {
                         >
                           {u.rol}
                         </span>
+                        <div className="mt-1">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
+                            Boolean(u.notificar_email) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                          }`}>
+                            {Boolean(u.notificar_email) ? 'Email on' : 'Email off'}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex justify-end gap-2">
