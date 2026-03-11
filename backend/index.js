@@ -21,6 +21,11 @@ const useCloudinary = Boolean(
   (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
 );
 const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
+const cloudinaryAuthMode = process.env.CLOUDINARY_URL
+  ? 'url'
+  : (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+    ? 'keys'
+    : 'none';
 const emailNotificationsEnabled = process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'false';
 const smtpConfigured = Boolean(
   process.env.SMTP_HOST &&
@@ -65,6 +70,8 @@ if (useCloudinary) {
     });
   }
 }
+
+console.log(`Cloudinary enabled: ${useCloudinary} (auth: ${cloudinaryAuthMode}, folder: ${cloudinaryFolder})`);
 
 app.use(cors({
   origin: (origin, callback) => {
