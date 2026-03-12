@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -37,8 +37,15 @@ function Dashboard() {
     linksNuevos: ['']
   });
 
-  const usuario = JSON.parse(localStorage.getItem('usuario'));
+  const usuario = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('usuario') || 'null');
+    } catch {
+      return null;
+    }
+  }, []);
   const navigate = useNavigate();
+  const cargandoPublicacionesRef = useRef(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,25 +57,33 @@ function Dashboard() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const cargarPublicaciones = async () => {
+  const cargarPublicaciones = useCallback(async () => {
+    if (!usuario?.id || cargandoPublicacionesRef.current) return;
+    cargandoPublicacionesRef.current = true;
     try {
       const res = await axios.get(apiUrl(`/api/publicaciones?usuario_id=${usuario.id}`));
       setPublicaciones(res.data);
-    } catch {
-      toast.error('Error al conectar con el servidor');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 429) {
+        toast.error('Demasiadas solicitudes. Espera unos segundos.', { id: 'dashboard-rate-limit' });
+      } else if (status === 401 || status === 403) {
+        toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'dashboard-auth' });
+      } else {
+        toast.error('Error al conectar con el servidor', { id: 'dashboard-load-error' });
+      }
+    } finally {
+      cargandoPublicacionesRef.current = false;
     }
-  };
+  }, [usuario?.id]);
 
   useEffect(() => {
     if (!usuario) {
       navigate('/');
       return;
     }
-    const timerId = window.setTimeout(() => {
-      void cargarPublicaciones();
-    }, 0);
-    return () => window.clearTimeout(timerId);
-  }, [navigate, usuario]);
+    void cargarPublicaciones();
+  }, [navigate, usuario, cargarPublicaciones]);
 
   const toggleDarkMode = () => {
     const next = !darkMode;
