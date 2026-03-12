@@ -95,13 +95,6 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   }
 }));
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api', apiLimiter);
-
 const loginLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 30,
@@ -114,6 +107,12 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api', apiLimiter);
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
