@@ -372,6 +372,32 @@ const startEmailQueueWorker = async () => {
   }, emailQueuePollMs);
 };
 
+const getClientIp = (req) => {
+  const xf = req.headers['x-forwarded-for'];
+  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
+  return req.ip;
+};
+
+const logAudit = async ({ userId, action, entity, entityId, metadata, req }) => {
+  try {
+    await db.query(
+      `INSERT INTO audit_logs (user_id, action, entity, entity_id, ip, user_agent, metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId || null,
+        action,
+        entity,
+        entityId || null,
+        getClientIp(req),
+        req.headers['user-agent'] || null,
+        metadata ? JSON.stringify(metadata) : null
+      ]
+    );
+  } catch (error) {
+    console.error('Audit log error:', error.message);
+  }
+};
+
 const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
 
 const getCloudinaryResourceType = (url) => {
@@ -515,6 +541,26 @@ const initSchema = async () => {
     )
   `);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NULL,
+      action VARCHAR(64) NOT NULL,
+      entity VARCHAR(64) NOT NULL,
+      entity_id INT NULL,
+      ip VARCHAR(64) NULL,
+      user_agent VARCHAR(255) NULL,
+      metadata JSON NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  try {
+    await db.query('CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at)');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+
   try {
     await db.query('CREATE INDEX idx_email_queue_status_next ON email_queue(status, next_attempt_at)');
   } catch (error) {
@@ -605,6 +651,15 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       }
     }
 
+    await logAudit({
+      userId: user.id,
+      action: 'login',
+      entity: 'user',
+      entityId: user.id,
+      metadata: { area: user.area, rol: user.rol },
+      req
+    });
+
     return res.json({
       success: true,
       usuario: { id: user.id, nombre_completo: user.nombre_completo, area: user.area, rol: user.rol },
@@ -675,6 +730,14 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
         notificar_email ? 1 : 0
       ]
     );
+    await logAudit({
+      userId: req.user?.id,
+      action: 'user.create',
+      entity: 'user',
+      entityId: result.insertId,
+      metadata: { rol, area: String(area).trim() },
+      req
+    });
     res.status(201).json({
       success: true,
       usuario: {
@@ -741,6 +804,14 @@ app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
         [String(nombre_completo).trim(), String(area).trim(), rol, emailNormalizado || null, notificar_email ? 1 : 0, id]
       );
     }
+    await logAudit({
+      userId: req.user?.id,
+      action: 'user.update',
+      entity: 'user',
+      entityId: Number(id),
+      metadata: { rol, area: String(area).trim() },
+      req
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -753,6 +824,13 @@ app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
     await db.query('UPDATE publicaciones SET autor_id = NULL WHERE autor_id = ?', [id]);
     await db.query('DELETE FROM registro_lecturas WHERE usuario_id = ?', [id]);
     await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
+    await logAudit({
+      userId: req.user?.id,
+      action: 'user.delete',
+      entity: 'user',
+      entityId: Number(id),
+      req
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -835,6 +913,14 @@ app.post('/api/publicaciones', requireAuth, requireAdmin, upload.fields([{ name:
     });
     if (encolados > 0) void processEmailQueue();
 
+    await logAudit({
+      userId: req.user?.id,
+      action: 'publication.create',
+      entity: 'publication',
+      entityId: publicacionId,
+      metadata: { categoria, titulo },
+      req
+    });
     res.json({ success: true, id: publicacionId, notificaciones_encoladas: encolados });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -904,6 +990,14 @@ app.put('/api/publicaciones/:id', requireAuth, requireAdmin, upload.fields([{ na
       );
     }
 
+    await logAudit({
+      userId: req.user?.id,
+      action: 'publication.update',
+      entity: 'publication',
+      entityId: Number(id),
+      metadata: { categoria, titulo },
+      req
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -922,6 +1016,13 @@ app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res)
 
     await db.query('DELETE FROM publicacion_recursos WHERE publicacion_id = ?', [id]);
     await db.query('UPDATE publicaciones SET eliminada = 1, imagen_url = NULL WHERE id = ?', [id]);
+    await logAudit({
+      userId: req.user?.id,
+      action: 'publication.delete',
+      entity: 'publication',
+      entityId: Number(id),
+      req
+    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -969,6 +1070,13 @@ app.delete('/api/reportes/:id', requireAuth, requireAdmin, async (req, res) => {
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Registro no encontrado' });
     }
+    await logAudit({
+      userId: req.user?.id,
+      action: 'report.delete',
+      entity: 'report',
+      entityId: Number(id),
+      req
+    });
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
