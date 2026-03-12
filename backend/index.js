@@ -669,7 +669,11 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
             [attempts, lockUntil, user.id]
           );
-          return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+          const remaining = Math.max(loginMaxAttempts - attempts, 0);
+          const msg = lockUntil
+            ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
+            : `Contrasena incorrecta. Te quedan ${remaining} intento(s).`;
+          return res.status(403).json({ success: false, message: msg, remaining_attempts: remaining });
         }
       } else {
         if (stored !== incoming) {
@@ -681,7 +685,11 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
             [attempts, lockUntil, user.id]
           );
-          return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+          const remaining = Math.max(loginMaxAttempts - attempts, 0);
+          const msg = lockUntil
+            ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
+            : `Contrasena incorrecta. Te quedan ${remaining} intento(s).`;
+          return res.status(403).json({ success: false, message: msg, remaining_attempts: remaining });
         }
         const hashed = await bcrypt.hash(incoming, 10);
         await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashed, user.id]);
