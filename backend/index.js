@@ -119,6 +119,12 @@ const parseJsonArray = (value) => {
 };
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+const normalizeText = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
 const sanitizeHtml = (value) => String(value || '')
@@ -512,21 +518,23 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
+    const areaNormalizada = normalizeText(area);
+    const nombreNormalizado = normalizeText(nombre);
     const [usuarios] = await db.query(
       `SELECT id, nombre_completo, area, rol, password
        FROM usuarios
-       WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ?`,
-      [String(nombre).trim().toLowerCase(), String(area).trim().toLowerCase()]
+       WHERE LOWER(TRIM(area)) = ?`,
+      [areaNormalizada]
     );
 
-    if (usuarios.length === 0) {
+    const user = usuarios.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
+    if (!user) {
       return res.status(403).json({
         success: false,
         message: 'Usuario no autorizado. Solicita al administrador agregar tu registro.'
       });
     }
 
-    const user = usuarios[0];
     if (user.rol === 'admin') {
       if (!password) return res.status(401).json({ success: false, message: 'REQUIRES_PASSWORD' });
       if (String(user.password || '') !== String(password)) {
