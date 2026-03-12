@@ -180,6 +180,22 @@ const requireAdmin = (req, res, next) => {
   }
   return next();
 };
+
+const registerFailedLogin = async (userId, attemptsSoFar) => {
+  const attempts = Math.max(Number(attemptsSoFar || 0) + 1, 1);
+  const lockUntil = attempts >= loginMaxAttempts
+    ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
+    : null;
+  await db.query(
+    'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
+    [attempts, lockUntil, userId]
+  );
+  const remaining = Math.max(loginMaxAttempts - attempts, 0);
+  const msg = lockUntil
+    ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
+    : `Te quedan ${remaining} intento(s).`;
+  return { remaining, message: msg, locked: Boolean(lockUntil) };
+};
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
 const sanitizeHtml = (value) => String(value || '')
@@ -632,13 +648,21 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     const areaNormalizada = normalizeText(area);
     const nombreNormalizado = normalizeText(nombre);
     const [usuarios] = await db.query(
-      `SELECT id, nombre_completo, area, rol, password
+      `SELECT id, nombre_completo, area, rol, password, failed_login_attempts, lock_until
        FROM usuarios`
     );
 
     const candidatos = usuarios.filter((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
     const user = candidatos.find((u) => normalizeText(u.area) === areaNormalizada);
     if (!user) {
+      if (candidatos.length === 1) {
+        const attempt = await registerFailedLogin(candidatos[0].id, candidatos[0].failed_login_attempts);
+        return res.status(403).json({
+          success: false,
+          message: `Area incorrecta. Verifica tu area registrada. ${attempt.message}`,
+          remaining_attempts: attempt.remaining
+        });
+      }
       return res.status(403).json({
         success: false,
         message: candidatos.length > 0
@@ -655,41 +679,32 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     }
 
     if (user.rol === 'admin') {
-      if (!password) return res.status(401).json({ success: false, message: 'REQUIRES_PASSWORD' });
+      if (!password) {
+        const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
+        return res.status(401).json({
+          success: false,
+          message: `Clave requerida. ${attempt.message}`,
+          remaining_attempts: attempt.remaining
+        });
+      }
       const stored = String(user.password || '');
       const incoming = String(password);
       if (isHashedPassword(stored)) {
         const ok = await bcrypt.compare(incoming, stored);
         if (!ok) {
-          const attempts = Number(user.failed_login_attempts || 0) + 1;
-          const lockUntil = attempts >= loginMaxAttempts
-            ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
-            : null;
-          await db.query(
-            'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
-            [attempts, lockUntil, user.id]
-          );
-          const remaining = Math.max(loginMaxAttempts - attempts, 0);
-          const msg = lockUntil
+          const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
+          const msg = attempt.locked
             ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
-            : `Contrasena incorrecta. Te quedan ${remaining} intento(s).`;
-          return res.status(403).json({ success: false, message: msg, remaining_attempts: remaining });
+            : `Contrasena incorrecta. ${attempt.message}`;
+          return res.status(403).json({ success: false, message: msg, remaining_attempts: attempt.remaining });
         }
       } else {
         if (stored !== incoming) {
-          const attempts = Number(user.failed_login_attempts || 0) + 1;
-          const lockUntil = attempts >= loginMaxAttempts
-            ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
-            : null;
-          await db.query(
-            'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
-            [attempts, lockUntil, user.id]
-          );
-          const remaining = Math.max(loginMaxAttempts - attempts, 0);
-          const msg = lockUntil
+          const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
+          const msg = attempt.locked
             ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
-            : `Contrasena incorrecta. Te quedan ${remaining} intento(s).`;
-          return res.status(403).json({ success: false, message: msg, remaining_attempts: remaining });
+            : `Contrasena incorrecta. ${attempt.message}`;
+          return res.status(403).json({ success: false, message: msg, remaining_attempts: attempt.remaining });
         }
         const hashed = await bcrypt.hash(incoming, 10);
         await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashed, user.id]);

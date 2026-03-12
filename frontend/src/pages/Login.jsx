@@ -55,15 +55,7 @@ function Login() {
         navigate('/dashboard');
       }
     } catch (error) {
-      if (error.response && error.response.status === 401) {
-        setPedirPass(true);
-        if (password !== "") {
-          toast.error("Contraseña de administrador incorrecta");
-          setPassword("");
-        } else {
-          toast("Usuario administrador: ingresa tu clave");
-        }
-      } else if (error.response && error.response.status === 423) {
+      if (error.response && error.response.status === 401) {\n        setPedirPass(true);\n        const msg = error.response?.data?.message;\n        if (password !== "") {\n          toast.error(msg || "Contraseña de administrador incorrecta");\n          setPassword("");\n        } else {\n          toast.error(msg || "Usuario administrador: ingresa tu clave");\n        }\n      } else if (error.response && error.response.status === 423) {
         const msg = error.response?.data?.message || 'Cuenta bloqueada temporalmente';
         toast.error(msg);
       } else if (error.response && error.response.status === 403) {
@@ -217,6 +209,7 @@ function Login() {
 }
 
 export default Login;
+
 
 
 
