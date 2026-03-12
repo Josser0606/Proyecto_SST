@@ -12,7 +12,6 @@ function Login() {
   const [pedirPass, setPedirPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false); // Estado para el modal
-  const [loginMessage, setLoginMessage] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,10 +22,7 @@ function Login() {
   const handlePreLogin = async (e) => {
     e.preventDefault();
     const nombreLimpio = nombre.trim();
-    if (!nombreLimpio) {
-      setLoginMessage('Por favor escribe tu nombre.');
-      return;
-    }
+    if (!nombreLimpio) return toast.error("Por favor escribe tu nombre");
 
     // Si es un usuario normal (no admin detectado), mostramos el modal bonito
     if (!pedirPass) {
@@ -50,7 +46,6 @@ function Login() {
       });
 
       if (response.data.success) {
-        setLoginMessage(null);
         localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
         if (response.data.token) {
           localStorage.setItem('token', response.data.token);
@@ -65,22 +60,17 @@ function Login() {
         if (password !== "") {
           toast.error("Contraseña de administrador incorrecta");
           setPassword("");
-          setLoginMessage('Contraseña incorrecta. Verifica y vuelve a intentar.');
         } else {
           toast("Usuario administrador: ingresa tu clave");
-          setLoginMessage('Perfil administrador: ingresa tu contraseña.');
         }
       } else if (error.response && error.response.status === 423) {
         const msg = error.response?.data?.message || 'Cuenta bloqueada temporalmente';
         toast.error(msg);
-        setLoginMessage(msg);
       } else if (error.response && error.response.status === 403) {
         const msg = error.response?.data?.message || 'Usuario no autorizado';
         toast.error(msg);
-        setLoginMessage(msg);
       } else {
         toast.error('Error de conexión con el servidor');
-        setLoginMessage('No pudimos conectar con el servidor. Intenta de nuevo.');
       }
       console.error(error);
     } finally {
@@ -159,7 +149,7 @@ function Login() {
                 placeholder="Ej: Juan Andres Hernandez Velez"
                 className={`w-full px-5 sm:px-6 py-4 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none transition-all font-bold text-slate-700 ${pedirPass ? 'bg-gray-100 text-gray-400' : 'bg-gray-50'}`}
                 value={nombre}
-                onChange={(e) => { setNombre(e.target.value); setLoginMessage(null); }}
+                onChange={(e) => setNombre(e.target.value)}
                 disabled={pedirPass}
               />
             </div>
@@ -171,7 +161,7 @@ function Login() {
                 <select 
                   className="w-full px-5 sm:px-6 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-700 appearance-none"
                   value={area}
-                  onChange={(e) => { setArea(e.target.value); setLoginMessage(null); }}
+                  onChange={(e) => setArea(e.target.value)}
                 >
                   <option value="SST y GH">SST y GH</option>
                   <option value="Aseguramineto de Calidad">Aseguramineto de Calidad</option>
@@ -192,15 +182,9 @@ function Login() {
                   autoFocus
                   className="w-full px-5 sm:px-6 py-4 border-2 border-red-100 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none bg-red-50 font-bold text-slate-800"
                    value={password}
-                  onChange={(e) => { setPassword(e.target.value); setLoginMessage(null); }}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
                 <p className="text-[10px] text-red-500 mt-2 ml-1 uppercase font-bold tracking-[0.15em]">Perfil de Administrador</p>
-              </div>
-            )}
-
-            {loginMessage && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] font-bold text-amber-800">
-                {loginMessage}
               </div>
             )}
 
@@ -233,4 +217,6 @@ function Login() {
 }
 
 export default Login;
+
+
 
