@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
+import { FiEye, FiEyeOff } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png'; 
 import { apiUrl, setAuthToken } from '../config/api';
 
@@ -9,6 +10,7 @@ function Login() {
   const [nombre, setNombre] = useState('');
   const [area, setArea] = useState('SST y GH');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [pedirPass, setPedirPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false); // Estado para el modal
@@ -17,6 +19,10 @@ function Login() {
   useEffect(() => {
     toast.dismiss();
   }, []);
+
+  useEffect(() => {
+    if (!pedirPass) setShowPassword(false);
+  }, [pedirPass]);
 
   // Función que se dispara al dar clic en el botón del formulario
   const handlePreLogin = async (e) => {
@@ -179,14 +185,32 @@ function Login() {
             ) : (
               <div className="animate-in slide-in-from-top-4 duration-400">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-red-600 mb-2 ml-1">Contraseña Requerida</label>
-                <input 
-                  type="password" 
-                  placeholder="••••••••"
-                  autoFocus
-                  className="w-full px-5 sm:px-6 py-4 border-2 border-red-100 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none bg-red-50 font-bold text-slate-800"
-                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    autoFocus
+                    className="w-full px-5 sm:px-6 pr-12 py-4 border-2 border-red-100 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none bg-red-50 font-bold text-slate-800"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? 'Ocultar contrasena' : 'Ver contrasena'}
+                    className={`absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full border shadow-sm transition-all duration-200 hover:scale-110 ${
+                      showPassword
+                        ? 'text-red-700 bg-red-100 border-red-200'
+                        : 'text-slate-700 bg-white border-slate-200'
+                    }`}
+                  >
+                    {showPassword ? (
+                      <FiEyeOff className="text-lg transition-transform duration-200 rotate-0 scale-100" />
+                    ) : (
+                      <FiEye className="text-lg transition-transform duration-200 rotate-0 scale-100" />
+                    )}
+                  </button>
+                </div>
                 <p className="text-[10px] text-red-500 mt-2 ml-1 uppercase font-bold tracking-[0.15em]">Perfil de Administrador</p>
               </div>
             )}
@@ -220,6 +244,7 @@ function Login() {
 }
 
 export default Login;
+
 
 
 
