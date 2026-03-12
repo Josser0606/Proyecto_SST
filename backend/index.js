@@ -522,12 +522,15 @@ app.post('/api/login', async (req, res) => {
     const nombreNormalizado = normalizeText(nombre);
     const [usuarios] = await db.query(
       `SELECT id, nombre_completo, area, rol, password
-       FROM usuarios
-       WHERE LOWER(TRIM(area)) = ?`,
-      [areaNormalizada]
+       FROM usuarios`
     );
 
-    const user = usuarios.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
+    const candidatos = usuarios.filter((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
+    let user = candidatos.find((u) => normalizeText(u.area) === areaNormalizada);
+    if (!user && candidatos.length === 1) {
+      // Si el nombre es unico, aceptar aunque el area tenga diferencias de formato/tildes.
+      user = candidatos[0];
+    }
     if (!user) {
       return res.status(403).json({
         success: false,
