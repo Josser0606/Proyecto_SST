@@ -57,10 +57,11 @@ function Login() {
           toast.error("Contraseña de administrador incorrecta");
           setPassword(""); 
         } else {
-          toast.info("Usuario administrador: ingresa tu clave");
+          toast("Usuario administrador: ingresa tu clave");
         }
       } else if (error.response && error.response.status === 403) {
-        toast.error(error.response.data.message);
+        const msg = error.response.data?.message || 'Usuario no autorizado';
+        toast.error(msg);
       } else {
         toast.error('Error de conexión con el servidor');
       }
