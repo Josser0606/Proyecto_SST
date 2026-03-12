@@ -63,6 +63,9 @@ function Login() {
         } else {
           toast("Usuario administrador: ingresa tu clave");
         }
+      } else if (error.response && error.response.status === 423) {
+        const msg = error.response?.data?.message || 'Cuenta bloqueada temporalmente';
+        toast.error(msg);
       } else if (error.response && error.response.status === 403) {
         const msg = error.response?.data?.message || 'Usuario no autorizado';
         toast.error(msg);

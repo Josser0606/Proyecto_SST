@@ -28,6 +28,8 @@ const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
 const authHeaderName = process.env.AUTH_HEADER_NAME || 'authorization';
+const loginMaxAttempts = Math.max(Number(process.env.LOGIN_MAX_ATTEMPTS || 5), 1);
+const loginLockMinutes = Math.max(Number(process.env.LOGIN_LOCK_MINUTES || 15), 1);
 const cloudinaryAuthMode = process.env.CLOUDINARY_URL
   ? 'url'
   : (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
@@ -514,6 +516,16 @@ const initSchema = async () => {
   } catch (error) {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
   }
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN lock_until DATETIME NULL');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
 
   try {
     await db.query('CREATE UNIQUE INDEX uq_usuarios_email ON usuarios(email)');
@@ -635,15 +647,40 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       });
     }
 
+    if (user.lock_until && new Date(user.lock_until) > new Date()) {
+      return res.status(423).json({
+        success: false,
+        message: 'Cuenta bloqueada temporalmente. Intenta mas tarde.'
+      });
+    }
+
     if (user.rol === 'admin') {
       if (!password) return res.status(401).json({ success: false, message: 'REQUIRES_PASSWORD' });
       const stored = String(user.password || '');
       const incoming = String(password);
       if (isHashedPassword(stored)) {
         const ok = await bcrypt.compare(incoming, stored);
-        if (!ok) return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+        if (!ok) {
+          const attempts = Number(user.failed_login_attempts || 0) + 1;
+          const lockUntil = attempts >= loginMaxAttempts
+            ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
+            : null;
+          await db.query(
+            'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
+            [attempts, lockUntil, user.id]
+          );
+          return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+        }
       } else {
         if (stored !== incoming) {
+          const attempts = Number(user.failed_login_attempts || 0) + 1;
+          const lockUntil = attempts >= loginMaxAttempts
+            ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
+            : null;
+          await db.query(
+            'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
+            [attempts, lockUntil, user.id]
+          );
           return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
         }
         const hashed = await bcrypt.hash(incoming, 10);
@@ -651,6 +688,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
       }
     }
 
+    await db.query('UPDATE usuarios SET failed_login_attempts = 0, lock_until = NULL WHERE id = ?', [user.id]);
     await logAudit({
       userId: user.id,
       action: 'login',
