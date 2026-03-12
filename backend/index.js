@@ -579,15 +579,13 @@ app.post('/api/login', loginLimiter, async (req, res) => {
     );
 
     const candidatos = usuarios.filter((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
-    let user = candidatos.find((u) => normalizeText(u.area) === areaNormalizada);
-    if (!user && candidatos.length === 1) {
-      // Si el nombre es unico, aceptar aunque el area tenga diferencias de formato/tildes.
-      user = candidatos[0];
-    }
+    const user = candidatos.find((u) => normalizeText(u.area) === areaNormalizada);
     if (!user) {
       return res.status(403).json({
         success: false,
-        message: 'Usuario no autorizado. Solicita al administrador agregar tu registro.'
+        message: candidatos.length > 0
+          ? 'Area incorrecta. Verifica tu area registrada.'
+          : 'Usuario no autorizado. Solicita al administrador agregar tu registro.'
       });
     }
 
