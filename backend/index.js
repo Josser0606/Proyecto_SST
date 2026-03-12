@@ -15,6 +15,7 @@ const iniciarTareas = require('./tareas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const trustProxySetting = process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : '0');
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
@@ -28,6 +29,10 @@ const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
 const authHeaderName = process.env.AUTH_HEADER_NAME || 'authorization';
+const loginRateLimitWindowMs = Math.max(Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000), 1000);
+const loginRateLimitMax = Math.max(Number(process.env.LOGIN_RATE_LIMIT_MAX || 30), 1);
+const apiRateLimitWindowMs = Math.max(Number(process.env.API_RATE_LIMIT_WINDOW_MS || 5 * 60 * 1000), 1000);
+const apiRateLimitMax = Math.max(Number(process.env.API_RATE_LIMIT_MAX || 600), 10);
 const loginMaxAttempts = Math.max(Number(process.env.LOGIN_MAX_ATTEMPTS || 5), 1);
 const loginLockMinutes = Math.max(Number(process.env.LOGIN_LOCK_MINUTES || 15), 1);
 const cloudinaryAuthMode = process.env.CLOUDINARY_URL
@@ -81,6 +86,7 @@ if (useCloudinary) {
 }
 
 console.log(`Cloudinary enabled: ${useCloudinary} (auth: ${cloudinaryAuthMode}, folder: ${cloudinaryFolder})`);
+app.set('trust proxy', trustProxySetting);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -98,16 +104,23 @@ app.use(cors({
   }
 }));
 const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 30,
+  windowMs: loginRateLimitWindowMs,
+  max: loginRateLimitMax,
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ success: false, message: 'Demasiados intentos de inicio de sesion. Intenta de nuevo en unos minutos.' });
+  }
 });
 const apiLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 600,
+  windowMs: apiRateLimitWindowMs,
+  max: apiRateLimitMax,
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => req.path === '/login' || req.originalUrl.startsWith('/api/login'),
+  handler: (req, res) => {
+    res.status(429).json({ success: false, message: 'Demasiadas solicitudes. Espera unos segundos e intenta nuevamente.' });
+  }
 });
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }

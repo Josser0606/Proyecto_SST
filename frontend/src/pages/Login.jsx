@@ -75,6 +75,9 @@ function Login() {
       } else if (error.response && error.response.status === 423) {
         const msg = error.response?.data?.message || 'Cuenta bloqueada temporalmente';
         toast.error(msg);
+      } else if (error.response && error.response.status === 429) {
+        const msg = error.response?.data?.message || 'Demasiados intentos. Intenta de nuevo en unos minutos.';
+        toast.error(msg, { id: 'login-rate-limit' });
       } else if (error.response && error.response.status === 403) {
         const msg = error.response?.data?.message || 'Usuario no autorizado';
         toast.error(msg);
