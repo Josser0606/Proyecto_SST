@@ -6,6 +6,10 @@ const fs = require('fs');
 require('dotenv').config();
 const { v2: cloudinary } = require('cloudinary');
 const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const iniciarTareas = require('./tareas');
 
@@ -21,6 +25,9 @@ const useCloudinary = Boolean(
   (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
 );
 const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
+const jwtSecret = process.env.JWT_SECRET || 'change-me';
+const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+const authHeaderName = process.env.AUTH_HEADER_NAME || 'authorization';
 const cloudinaryAuthMode = process.env.CLOUDINARY_URL
   ? 'url'
   : (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
@@ -88,8 +95,25 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   }
 }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api', apiLimiter);
+
+const loginLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+const apiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -125,6 +149,36 @@ const normalizeText = (value) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toLowerCase();
+
+const isHashedPassword = (value) => typeof value === 'string' && value.startsWith('$2');
+
+const signToken = (payload) => jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn });
+
+const getAuthToken = (req) => {
+  const header = req.headers[authHeaderName];
+  if (!header || typeof header !== 'string') return null;
+  const [scheme, token] = header.split(' ');
+  if (scheme?.toLowerCase() !== 'bearer') return null;
+  return token || null;
+};
+
+const requireAuth = (req, res, next) => {
+  const token = getAuthToken(req);
+  if (!token) return res.status(401).json({ success: false, message: 'TOKEN_REQUIRED' });
+  try {
+    req.user = jwt.verify(token, jwtSecret);
+    return next();
+  } catch {
+    return res.status(401).json({ success: false, message: 'TOKEN_INVALID' });
+  }
+};
+
+const requireAdmin = (req, res, next) => {
+  if (req.user?.rol !== 'admin') {
+    return res.status(403).json({ success: false, message: 'ADMIN_REQUIRED' });
+  }
+  return next();
+};
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
 const sanitizeHtml = (value) => String(value || '')
@@ -511,7 +565,7 @@ app.get('/', (req, res) => {
   res.send('Servidor SACIAR activo');
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', loginLimiter, async (req, res) => {
   const { nombre, area, password } = req.body;
   if (!nombre || !area) {
     return res.status(400).json({ success: false, message: 'Nombre y area son obligatorios' });
@@ -540,21 +594,31 @@ app.post('/api/login', async (req, res) => {
 
     if (user.rol === 'admin') {
       if (!password) return res.status(401).json({ success: false, message: 'REQUIRES_PASSWORD' });
-      if (String(user.password || '') !== String(password)) {
-        return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+      const stored = String(user.password || '');
+      const incoming = String(password);
+      if (isHashedPassword(stored)) {
+        const ok = await bcrypt.compare(incoming, stored);
+        if (!ok) return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+      } else {
+        if (stored !== incoming) {
+          return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
+        }
+        const hashed = await bcrypt.hash(incoming, 10);
+        await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashed, user.id]);
       }
     }
 
     return res.json({
       success: true,
-      usuario: { id: user.id, nombre_completo: user.nombre_completo, area: user.area, rol: user.rol }
+      usuario: { id: user.id, nombre_completo: user.nombre_completo, area: user.area, rol: user.rol },
+      token: signToken({ id: user.id, rol: user.rol })
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/usuarios', async (req, res) => {
+app.get('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
@@ -567,7 +631,7 @@ app.get('/api/usuarios', async (req, res) => {
   }
 });
 
-app.post('/api/usuarios', async (req, res) => {
+app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
   const { nombre_completo, area, rol = 'empleado', password = null, email = null, notificar_email = true } = req.body;
   if (!nombre_completo || !area) {
     return res.status(400).json({ success: false, message: 'Nombre y area son obligatorios' });
@@ -602,13 +666,14 @@ app.post('/api/usuarios', async (req, res) => {
       }
     }
 
+    const hashedPassword = rol === 'admin' && password ? await bcrypt.hash(String(password), 10) : null;
     const [result] = await db.query(
       'INSERT INTO usuarios (nombre_completo, area, rol, password, email, notificar_email) VALUES (?, ?, ?, ?, ?, ?)',
       [
         String(nombre_completo).trim(),
         String(area).trim(),
         rol,
-        rol === 'admin' ? String(password) : null,
+        hashedPassword,
         emailNormalizado || null,
         notificar_email ? 1 : 0
       ]
@@ -629,7 +694,7 @@ app.post('/api/usuarios', async (req, res) => {
   }
 });
 
-app.put('/api/usuarios/:id', async (req, res) => {
+app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { nombre_completo, area, rol, password, email = null, notificar_email = true } = req.body;
   if (!nombre_completo || !area || !rol) {
@@ -662,9 +727,10 @@ app.put('/api/usuarios/:id', async (req, res) => {
 
     if (rol === 'admin') {
       if (password) {
+        const hashed = await bcrypt.hash(String(password), 10);
         await db.query(
           'UPDATE usuarios SET nombre_completo = ?, area = ?, rol = ?, password = ?, email = ?, notificar_email = ? WHERE id = ?',
-          [String(nombre_completo).trim(), String(area).trim(), rol, String(password), emailNormalizado || null, notificar_email ? 1 : 0, id]
+          [String(nombre_completo).trim(), String(area).trim(), rol, hashed, emailNormalizado || null, notificar_email ? 1 : 0, id]
         );
       } else {
         await db.query(
@@ -684,7 +750,7 @@ app.put('/api/usuarios/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/usuarios/:id', async (req, res) => {
+app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     await db.query('UPDATE publicaciones SET autor_id = NULL WHERE autor_id = ?', [id]);
@@ -696,16 +762,16 @@ app.delete('/api/usuarios/:id', async (req, res) => {
   }
 });
 
-app.get('/api/publicaciones', async (req, res) => {
+app.get('/api/publicaciones', requireAuth, async (req, res) => {
   try {
-    const rows = await getPublicacionesWithRecursos(req.query.usuario_id || 0);
+    const rows = await getPublicacionesWithRecursos(req.user?.id || 0);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/publicaciones', upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
+app.post('/api/publicaciones', requireAuth, requireAdmin, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
   const { titulo, contenido, categoria, autor_id } = req.body;
   const imagen = req.files?.imagen?.[0];
   const imagenesNuevas = req.files?.imagenes || [];
@@ -778,7 +844,7 @@ app.post('/api/publicaciones', upload.fields([{ name: 'imagen', maxCount: 1 }, {
   }
 });
 
-app.put('/api/publicaciones/:id', upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
+app.put('/api/publicaciones/:id', requireAuth, requireAdmin, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
   const { id } = req.params;
   const { titulo, contenido, categoria } = req.body;
   const imagenNueva = req.files?.imagen?.[0];
@@ -847,7 +913,7 @@ app.put('/api/publicaciones/:id', upload.fields([{ name: 'imagen', maxCount: 1 }
   }
 });
 
-app.delete('/api/publicaciones/:id', async (req, res) => {
+app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const [pubRows] = await db.query('SELECT imagen_url FROM publicaciones WHERE id = ?', [id]);
@@ -865,17 +931,17 @@ app.delete('/api/publicaciones/:id', async (req, res) => {
   }
 });
 
-app.post('/api/registrar-vista', async (req, res) => {
-  const { usuario_id, publicacion_id } = req.body;
+app.post('/api/registrar-vista', requireAuth, async (req, res) => {
+  const { publicacion_id } = req.body;
   try {
-    await db.query('INSERT IGNORE INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)', [usuario_id, publicacion_id]);
+    await db.query('INSERT IGNORE INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)', [req.user.id, publicacion_id]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/reportes', async (req, res) => {
+app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT 
@@ -899,7 +965,7 @@ app.get('/api/reportes', async (req, res) => {
   }
 });
 
-app.delete('/api/reportes/:id', async (req, res) => {
+app.delete('/api/reportes/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await db.query('DELETE FROM registro_lecturas WHERE id = ?', [id]);
@@ -912,7 +978,7 @@ app.delete('/api/reportes/:id', async (req, res) => {
   }
 });
 
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
     const [totalPubs] = await db.query('SELECT COUNT(*) AS total FROM publicaciones');
     const [totalLecturas] = await db.query('SELECT COUNT(*) AS total FROM registro_lecturas');

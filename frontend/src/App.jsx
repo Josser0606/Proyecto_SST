@@ -9,6 +9,7 @@ import Admin from './pages/Admin';
 import RegistroEmpleado from './pages/RegistroEmpleado';
 import AdminPanel from './pages/AdminPanel';
 import Reportes from './pages/Reportes';
+import { setAuthToken } from './config/api';
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
 
@@ -27,6 +28,8 @@ function SessionInactivityGuard() {
         if (!localStorage.getItem('usuario')) return;
         toast.dismiss();
         localStorage.removeItem('usuario');
+        localStorage.removeItem('token');
+        setAuthToken(null);
         toast.error('Sesion cerrada por inactividad');
         navigate('/', { replace: true });
       }, INACTIVITY_TIMEOUT_MS);
@@ -54,6 +57,11 @@ function SessionInactivityGuard() {
 }
 
 function App() {
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) setAuthToken(token);
+  }, []);
+
   return (
     <BrowserRouter>
       <SessionInactivityGuard />

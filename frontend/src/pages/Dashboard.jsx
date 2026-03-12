@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import logoSaciar from '../assets/logo_saciar.png';
-import { apiUrl, assetUrl } from '../config/api';
+import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 
 const CATEGORIAS = [
   'Todas',
@@ -127,6 +127,7 @@ function Dashboard() {
     if (!confirmado) return;
     toast.dismiss();
     localStorage.clear();
+    setAuthToken(null);
     toast.success('Sesion cerrada');
     navigate('/');
   };

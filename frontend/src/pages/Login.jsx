@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
 import logoSaciar from '../assets/logo_saciar.png'; 
-import { apiUrl } from '../config/api';
+import { apiUrl, setAuthToken } from '../config/api';
 
 function Login() {
   const [nombre, setNombre] = useState('');
@@ -47,6 +47,10 @@ function Login() {
 
       if (response.data.success) {
         localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          setAuthToken(response.data.token);
+        }
         toast.success('¡Ingreso exitoso!');
         navigate('/dashboard');
       }

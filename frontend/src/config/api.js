@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const API_BASE_URL = rawApiUrl.replace(/\/+$/, '');
 
@@ -22,3 +24,11 @@ export const assetUrl = (path = '') => {
 };
 
 export { API_BASE_URL };
+
+export const setAuthToken = (token) => {
+  if (token) {
+    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
+  } else {
+    delete axios.defaults.headers.common.Authorization;
+  }
+};
