@@ -680,11 +680,9 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     if (user.rol === 'admin') {
       if (!password) {
-        const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
         return res.status(401).json({
           success: false,
-          message: `Clave requerida. ${attempt.message}`,
-          remaining_attempts: attempt.remaining
+          message: 'REQUIRES_PASSWORD'
         });
       }
       const stored = String(user.password || '');

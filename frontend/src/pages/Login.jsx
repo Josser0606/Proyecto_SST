@@ -58,7 +58,9 @@ function Login() {
       if (error.response && error.response.status === 401) {
         setPedirPass(true);
         const msg = error.response?.data?.message;
-        if (password !== "") {
+        if (msg === 'REQUIRES_PASSWORD') {
+          toast("Usuario administrador: ingresa tu clave");
+        } else if (password !== "") {
           toast.error(msg || "Contrasena de administrador incorrecta");
           setPassword("");
         } else {
