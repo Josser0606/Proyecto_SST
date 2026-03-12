@@ -55,14 +55,23 @@ function Login() {
         navigate('/dashboard');
       }
     } catch (error) {
-      if (error.response && error.response.status === 401) {\n        setPedirPass(true);\n        const msg = error.response?.data?.message;\n        if (password !== "") {\n          toast.error(msg || "Contraseña de administrador incorrecta");\n          setPassword("");\n        } else {\n          toast.error(msg || "Usuario administrador: ingresa tu clave");\n        }\n      } else if (error.response && error.response.status === 423) {
+      if (error.response && error.response.status === 401) {
+        setPedirPass(true);
+        const msg = error.response?.data?.message;
+        if (password !== "") {
+          toast.error(msg || "Contrasena de administrador incorrecta");
+          setPassword("");
+        } else {
+          toast.error(msg || "Usuario administrador: ingresa tu clave");
+        }
+      } else if (error.response && error.response.status === 423) {
         const msg = error.response?.data?.message || 'Cuenta bloqueada temporalmente';
         toast.error(msg);
       } else if (error.response && error.response.status === 403) {
         const msg = error.response?.data?.message || 'Usuario no autorizado';
         toast.error(msg);
       } else {
-        toast.error('Error de conexión con el servidor');
+        toast.error('Error de conexion con el servidor');
       }
       console.error(error);
     } finally {
@@ -209,6 +218,7 @@ function Login() {
 }
 
 export default Login;
+
 
 
 
