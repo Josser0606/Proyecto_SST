@@ -19,7 +19,7 @@ function Login() {
   }, []);
 
   // Función que se dispara al dar clic en el botón del formulario
-  const handlePreLogin = (e) => {
+  const handlePreLogin = async (e) => {
     e.preventDefault();
     const nombreLimpio = nombre.trim();
     if (!nombreLimpio) return toast.error("Por favor escribe tu nombre");
@@ -29,7 +29,7 @@ function Login() {
       setMostrarConfirmacion(true);
     } else {
       // Si ya estamos pidiendo password, ejecutamos el login directo
-      handleLogin();
+      await handleLogin();
     }
   };
 
@@ -64,7 +64,7 @@ function Login() {
           toast("Usuario administrador: ingresa tu clave");
         }
       } else if (error.response && error.response.status === 403) {
-        const msg = error.response.data?.message || 'Usuario no autorizado';
+        const msg = error.response?.data?.message || 'Usuario no autorizado';
         toast.error(msg);
       } else {
         toast.error('Error de conexión con el servidor');
