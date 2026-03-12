@@ -585,11 +585,12 @@ app.post('/api/usuarios', async (req, res) => {
 
   try {
     const [existente] = await db.query(
-      `SELECT id FROM usuarios WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ?`,
-      [String(nombre_completo).trim().toLowerCase(), String(area).trim().toLowerCase()]
+      `SELECT id, nombre_completo FROM usuarios`
     );
-    if (existente.length > 0) {
-      return res.status(409).json({ success: false, message: 'Ya existe un usuario con ese nombre y area' });
+    const nombreNormalizado = normalizeText(nombre_completo);
+    const duplicadoNombre = existente.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
+    if (duplicadoNombre) {
+      return res.status(409).json({ success: false, message: 'Ya existe un usuario con ese nombre completo' });
     }
     if (emailNormalizado) {
       const [correoExistente] = await db.query(
@@ -641,11 +642,13 @@ app.put('/api/usuarios/:id', async (req, res) => {
 
   try {
     const [duplicados] = await db.query(
-      `SELECT id FROM usuarios WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ? AND id <> ?`,
-      [String(nombre_completo).trim().toLowerCase(), String(area).trim().toLowerCase(), id]
+      `SELECT id, nombre_completo FROM usuarios WHERE id <> ?`,
+      [id]
     );
-    if (duplicados.length > 0) {
-      return res.status(409).json({ success: false, message: 'Ya existe otro usuario con ese nombre y area' });
+    const nombreNormalizado = normalizeText(nombre_completo);
+    const duplicadoNombre = duplicados.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
+    if (duplicadoNombre) {
+      return res.status(409).json({ success: false, message: 'Ya existe otro usuario con ese nombre completo' });
     }
     if (emailNormalizado) {
       const [correoDuplicado] = await db.query(
