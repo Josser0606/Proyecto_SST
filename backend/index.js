@@ -672,7 +672,7 @@ const getPublicacionesWithRecursos = async (usuarioId) => {
       ELSE 0
     END AS requiere_reconfirmacion,
     CASE
-      WHEN NOW() <= DATE_ADD(p.fecha_publicacion, INTERVAL ? DAY) THEN 1
+      WHEN NOW() <= DATE_ADD(COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion), INTERVAL ? DAY) THEN 1
       ELSE 0
     END AS puede_confirmar_lectura
     FROM publicaciones p
@@ -1185,11 +1185,13 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
     }
 
     const fechaPub = new Date(pubRows[0].fecha_publicacion);
-    const limite = new Date(fechaPub.getTime() + readConfirmWindowDays * 24 * 60 * 60 * 1000);
+    const fechaActualizacionLectura = pubRows[0]?.fecha_actualizacion_lectura ? new Date(pubRows[0].fecha_actualizacion_lectura) : null;
+    const fechaBaseConfirmacion = fechaActualizacionLectura || fechaPub;
+    const limite = new Date(fechaBaseConfirmacion.getTime() + readConfirmWindowDays * 24 * 60 * 60 * 1000);
     if (new Date() > limite) {
       return res.status(410).json({
         success: false,
-        message: `El plazo para confirmar lectura vencio (${readConfirmWindowDays} dias desde la publicacion).`
+        message: `El plazo para confirmar lectura vencio (${readConfirmWindowDays} dias desde la ultima publicacion/actualizacion).`
       });
     }
 
@@ -1202,7 +1204,6 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
       [req.user.id, publicacion_id]
     );
     const lecturaPrev = lecturaRows[0]?.fecha_lectura ? new Date(lecturaRows[0].fecha_lectura) : null;
-    const fechaActualizacionLectura = pubRows[0]?.fecha_actualizacion_lectura ? new Date(pubRows[0].fecha_actualizacion_lectura) : null;
     const puntoLecturaVigente = fechaActualizacionLectura || fechaPub;
 
     if (lecturaPrev && lecturaPrev >= puntoLecturaVigente) {
