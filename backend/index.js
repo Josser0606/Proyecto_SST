@@ -20,6 +20,18 @@ const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL ||
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
+const allowLocalOrigins = process.env.ALLOW_LOCAL_ORIGINS !== 'false';
+const localOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+const effectiveAllowedOrigins = allowLocalOrigins
+  ? Array.from(new Set([...allowedOrigins, ...localOrigins]))
+  : allowedOrigins;
 const allowVercelPreview = process.env.ALLOW_VERCEL_PREVIEW === 'true';
 const useCloudinary = Boolean(
   process.env.CLOUDINARY_URL ||
@@ -92,7 +104,7 @@ app.set('trust proxy', trustProxySetting);
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (effectiveAllowedOrigins.includes(origin)) return callback(null, true);
     if (allowVercelPreview) {
       try {
         const { hostname } = new URL(origin);
