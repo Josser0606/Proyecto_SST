@@ -97,14 +97,14 @@ function Dashboard() {
     localStorage.setItem('sidebarCollapsed', String(next));
   };
 
-  const marcarComoLeido = async (pubId) => {
+  const marcarComoLeido = async (pubId, esReconfirmacion = false) => {
     const loadingToast = toast.loading('Registrando lectura...');
     try {
       await axios.post(apiUrl('/api/registrar-vista'), {
         usuario_id: usuario.id,
         publicacion_id: pubId
       });
-      toast.success('Lectura confirmada', { id: loadingToast });
+      toast.success(esReconfirmacion ? 'Reconfirmacion confirmada' : 'Lectura confirmada', { id: loadingToast });
       cargarPublicaciones();
     } catch (error) {
       const status = error?.response?.status;
@@ -606,7 +606,7 @@ function Dashboard() {
 
                   <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-8 border-t ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
                     <button
-                      onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id)}
+                      onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id, requiereReconfirmacion)}
                       disabled={leidoVigente || bloqueoPorPlazo}
                       className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
                         leidoVigente || bloqueoPorPlazo
