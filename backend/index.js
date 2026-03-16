@@ -655,37 +655,68 @@ const initSchema = async () => {
 };
 
 const getPublicacionesWithRecursos = async (usuarioId) => {
-  const [publicaciones] = await db.query(
-    `SELECT p.*,
-    rl.ultima_lectura,
-    CASE
-      WHEN rl.ultima_lectura IS NOT NULL
-        AND rl.ultima_lectura >= COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion)
-      THEN 1
-      ELSE 0
-    END AS leido,
-    CASE
-      WHEN rl.ultima_lectura IS NOT NULL
-        AND p.fecha_actualizacion_lectura IS NOT NULL
-        AND rl.ultima_lectura < p.fecha_actualizacion_lectura
-      THEN 1
-      ELSE 0
-    END AS requiere_reconfirmacion,
-    CASE
-      WHEN NOW() <= DATE_ADD(COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion), INTERVAL ? DAY) THEN 1
-      ELSE 0
-    END AS puede_confirmar_lectura
-    FROM publicaciones p
-    LEFT JOIN (
-      SELECT publicacion_id, MAX(fecha_lectura) AS ultima_lectura
-      FROM registro_lecturas
-      WHERE usuario_id = ?
-      GROUP BY publicacion_id
-    ) rl ON rl.publicacion_id = p.id
-    WHERE COALESCE(p.eliminada, 0) = 0
-    ORDER BY p.fecha_publicacion DESC`,
-    [readConfirmWindowDays, usuarioId || 0]
-  );
+  let publicaciones;
+  try {
+    [publicaciones] = await db.query(
+      `SELECT p.*,
+      rl.ultima_lectura,
+      CASE
+        WHEN rl.ultima_lectura IS NOT NULL
+          AND rl.ultima_lectura >= COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion)
+        THEN 1
+        ELSE 0
+      END AS leido,
+      CASE
+        WHEN rl.ultima_lectura IS NOT NULL
+          AND p.fecha_actualizacion_lectura IS NOT NULL
+          AND rl.ultima_lectura < p.fecha_actualizacion_lectura
+        THEN 1
+        ELSE 0
+      END AS requiere_reconfirmacion,
+      CASE
+        WHEN NOW() <= DATE_ADD(COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion), INTERVAL ? DAY) THEN 1
+        ELSE 0
+      END AS puede_confirmar_lectura
+      FROM publicaciones p
+      LEFT JOIN (
+        SELECT publicacion_id, MAX(fecha_lectura) AS ultima_lectura
+        FROM registro_lecturas
+        WHERE usuario_id = ?
+        GROUP BY publicacion_id
+      ) rl ON rl.publicacion_id = p.id
+      WHERE COALESCE(p.eliminada, 0) = 0
+      ORDER BY p.fecha_publicacion DESC`,
+      [readConfirmWindowDays, usuarioId || 0]
+    );
+  } catch (queryError) {
+    if (queryError.code !== 'ER_BAD_FIELD_ERROR') throw queryError;
+    // Compatibilidad con esquemas sin fecha_actualizacion_lectura.
+    [publicaciones] = await db.query(
+      `SELECT p.*,
+      rl.ultima_lectura,
+      CASE
+        WHEN rl.ultima_lectura IS NOT NULL
+          AND rl.ultima_lectura >= p.fecha_publicacion
+        THEN 1
+        ELSE 0
+      END AS leido,
+      0 AS requiere_reconfirmacion,
+      CASE
+        WHEN NOW() <= DATE_ADD(p.fecha_publicacion, INTERVAL ? DAY) THEN 1
+        ELSE 0
+      END AS puede_confirmar_lectura
+      FROM publicaciones p
+      LEFT JOIN (
+        SELECT publicacion_id, MAX(fecha_lectura) AS ultima_lectura
+        FROM registro_lecturas
+        WHERE usuario_id = ?
+        GROUP BY publicacion_id
+      ) rl ON rl.publicacion_id = p.id
+      WHERE COALESCE(p.eliminada, 0) = 0
+      ORDER BY p.fecha_publicacion DESC`,
+      [readConfirmWindowDays, usuarioId || 0]
+    );
+  }
 
   if (publicaciones.length === 0) return [];
   const ids = publicaciones.map((p) => p.id);
@@ -1176,10 +1207,24 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, message: 'publicacion_id es obligatorio' });
   }
   try {
-    const [pubRows] = await db.query(
-      'SELECT id, fecha_publicacion, fecha_actualizacion_lectura FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
-      [publicacion_id]
-    );
+    let pubRows;
+    try {
+      [pubRows] = await db.query(
+        'SELECT id, fecha_publicacion, fecha_actualizacion_lectura FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+        [publicacion_id]
+      );
+    } catch (pubQueryError) {
+      if (pubQueryError.code === 'ER_BAD_FIELD_ERROR') {
+        // Compatibilidad con despliegues donde la columna nueva aun no existe.
+        const [fallbackRows] = await db.query(
+          'SELECT id, fecha_publicacion FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+          [publicacion_id]
+        );
+        pubRows = fallbackRows.map((r) => ({ ...r, fecha_actualizacion_lectura: null }));
+      } else {
+        throw pubQueryError;
+      }
+    }
     if (!pubRows.length) {
       return res.status(404).json({ success: false, message: 'Publicacion no encontrada' });
     }
@@ -1235,7 +1280,8 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
     }
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error en /api/registrar-vista:', error.message);
+    res.status(500).json({ success: false, message: 'No fue posible registrar la lectura' });
   }
 });
 
