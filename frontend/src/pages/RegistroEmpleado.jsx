@@ -228,7 +228,7 @@ function RegistroEmpleado() {
             title="Ir al dashboard"
           />
           <div className={`h-5 w-[1px] hidden sm:block ${darkMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
-          <span className="text-[11px] font-bold text-green-600 uppercase tracking-widest hidden sm:block">
+          <span className="text-[11px] font-bold text-green-600 uppercase tracking-normal hidden sm:block">
             Gestion de Empleados
           </span>
         </div>
