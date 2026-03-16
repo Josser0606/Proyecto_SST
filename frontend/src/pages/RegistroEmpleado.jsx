@@ -30,6 +30,7 @@ function RegistroEmpleado() {
   const [filtro, setFiltro] = useState('');
   const [formData, setFormData] = useState(BASE_FORM);
   const [editandoId, setEditandoId] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
@@ -107,6 +108,7 @@ function RegistroEmpleado() {
       }
 
       limpiarFormulario();
+      setFormOpen(false);
       cargarUsuarios();
     } catch (error) {
       const mensaje = error.response?.data?.message || 'No fue posible guardar';
@@ -117,6 +119,7 @@ function RegistroEmpleado() {
   };
 
   const editarUsuario = (usuario) => {
+    setFormOpen(true);
     setEditandoId(usuario.id);
     toast('Editando empleado');
     setFormData({
@@ -362,7 +365,40 @@ function RegistroEmpleado() {
             </div>
           </section>
 
-          <div className="grid lg:grid-cols-5 gap-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
+              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Gestiona el personal y abre el formulario solo cuando lo necesites.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (formOpen && !editandoId) {
+                  setFormOpen(false);
+                  return;
+                }
+                limpiarFormulario();
+                setFormOpen(true);
+                window.requestAnimationFrame(() => {
+                  if (formRef.current) {
+                    formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                });
+              }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
+                formOpen && !editandoId
+                  ? (darkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+            >
+              {formOpen && !editandoId ? 'Ocultar formulario' : 'Crear empleado'}
+            </button>
+          </div>
+
+          <div className={`grid gap-6 ${formOpen ? 'lg:grid-cols-5' : 'grid-cols-1'}`}>
+          {formOpen && (
           <form ref={formRef} onSubmit={handleSubmit} className={`lg:col-span-2 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 space-y-4 ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
@@ -479,18 +515,30 @@ function RegistroEmpleado() {
                   Cancelar
                 </button>
               )}
+              {!editandoId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    limpiarFormulario();
+                    setFormOpen(false);
+                  }}
+                  className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-wider ${
+                    darkMode ? 'border-slate-700 text-slate-300 hover:text-white hover:border-slate-500' : 'border-gray-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  Cerrar
+                </button>
+              )}
             </div>
           </form>
+          )}
 
-          <section className={`lg:col-span-3 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 ${
+          <section className={`${formOpen ? 'lg:col-span-3' : 'col-span-1'} rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
             <div className="mb-5">
               <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-                <div>
-                  <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
-                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
-                </div>
+                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
 
                 <div className="w-full lg:w-[360px]">
                   <label className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
