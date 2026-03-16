@@ -81,20 +81,23 @@ function Reportes() {
     return reporte.filter((reg) =>
       (reg.empleado || '').toLowerCase().includes(t) ||
       (reg.publicacion || '').toLowerCase().includes(t) ||
-      (reg.area || '').toLowerCase().includes(t)
+      (reg.area || '').toLowerCase().includes(t) ||
+      (reg.tipo_confirmacion || '').toLowerCase().includes(t) ||
+      (reg.categoria_auditoria || '').toLowerCase().includes(t)
     );
   }, [reporte, filtro]);
 
   const datosAgrupadosPorCategoria = useMemo(() => {
     const grupos = datosFiltrados.reduce((acc, reg) => {
-      const categoria = (reg.area || 'Sin area').trim() || 'Sin area';
+      const categoria = (reg.categoria_auditoria || 'Confirmaciones iniciales').trim() || 'Confirmaciones iniciales';
       if (!acc[categoria]) acc[categoria] = [];
       acc[categoria].push(reg);
       return acc;
     }, {});
 
+    const orden = { 'Confirmaciones iniciales': 1, Reconfirmaciones: 2 };
     return Object.entries(grupos)
-      .sort((a, b) => a[0].localeCompare(b[0], 'es', { sensitivity: 'base' }))
+      .sort((a, b) => (orden[a[0]] || 99) - (orden[b[0]] || 99))
       .map(([categoria, registros]) => ({ categoria, registros }));
   }, [datosFiltrados]);
 
@@ -182,6 +185,7 @@ function Reportes() {
         <td>${escaparHtml(r.comunicado)}</td>
         <td>${escaparHtml(r.empleado)}</td>
         <td>${escaparHtml(r.area)}</td>
+        <td>${escaparHtml(r.tipo_confirmacion)}</td>
         <td>${escaparHtml(r.fecha_confirmacion)}</td>
       </tr>
     `).join('');
@@ -193,6 +197,7 @@ function Reportes() {
             <th>Comunicado</th>
             <th>Empleado</th>
             <th>Area</th>
+            <th>Tipo</th>
             <th>Fecha de Confirmacion</th>
           </tr>
         </thead>
@@ -229,6 +234,7 @@ function Reportes() {
       comunicado: reg.publicacion || '',
       empleado: reg.empleado || '',
       area: reg.area || '',
+      tipo_confirmacion: reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial',
       fecha_confirmacion: formatearFechaLectura(reg.fecha_lectura)
     }));
 
@@ -719,11 +725,20 @@ function Reportes() {
                               <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
                             </div>
                             <div className="mt-3 flex items-center justify-between gap-2">
-                              <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                              }`}>
-                                {reg.area}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                  darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                                }`}>
+                                  {reg.area}
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                  reg.tipo_confirmacion === 'reconfirmacion'
+                                    ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                    : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                }`}>
+                                  {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
+                                </span>
+                              </div>
                               <div className="flex items-center gap-2">
                                 <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {formatearFechaLectura(reg.fecha_lectura)}
@@ -756,11 +771,20 @@ function Reportes() {
                       <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
                     </div>
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                        darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                      }`}>
-                        {reg.area}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                          darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                        }`}>
+                          {reg.area}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                          reg.tipo_confirmacion === 'reconfirmacion'
+                            ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                            : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                        }`}>
+                          {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
+                        </span>
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {formatearFechaLectura(reg.fecha_lectura)}
@@ -840,11 +864,20 @@ function Reportes() {
                                   <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                                    darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                  }`}>
-                                    {reg.area}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                                      darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}>
+                                      {reg.area}
+                                    </span>
+                                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                      reg.tipo_confirmacion === 'reconfirmacion'
+                                        ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                        : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                    }`}>
+                                      {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {formatearFechaLectura(reg.fecha_lectura)}
@@ -890,11 +923,20 @@ function Reportes() {
                           <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
                         </td>
                         <td className="px-8 py-5">
-                          <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                            darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            {reg.area}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                              darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              {reg.area}
+                            </span>
+                            <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                              reg.tipo_confirmacion === 'reconfirmacion'
+                                ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                            }`}>
+                              {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                            </span>
+                          </div>
                         </td>
                         <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {formatearFechaLectura(reg.fecha_lectura)}

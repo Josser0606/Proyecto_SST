@@ -563,6 +563,22 @@ const initSchema = async () => {
   }
 
   try {
+    await db.query("ALTER TABLE registro_lecturas ADD COLUMN tipo_confirmacion ENUM('confirmacion','reconfirmacion') NOT NULL DEFAULT 'confirmacion'");
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE registro_lecturas ADD COLUMN oculto_reporte TINYINT(1) NOT NULL DEFAULT 0');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE registro_lecturas ADD COLUMN oculto_reporte_at DATETIME NULL');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+
+  try {
     await db.query('CREATE UNIQUE INDEX uq_usuarios_email ON usuarios(email)');
   } catch (error) {
     if (!['ER_DUP_KEYNAME', 'ER_DUP_ENTRY'].includes(error.code)) throw error;
@@ -1140,7 +1156,7 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
   const { publicacion_id } = req.body;
   try {
     const [pubRows] = await db.query(
-      'SELECT id, fecha_publicacion FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+      'SELECT id, fecha_publicacion, fecha_actualizacion_lectura FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
       [publicacion_id]
     );
     if (!pubRows.length) {
@@ -1156,11 +1172,33 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
       });
     }
 
-    await db.query(
-      `INSERT INTO registro_lecturas (usuario_id, publicacion_id)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE fecha_lectura = CURRENT_TIMESTAMP`,
+    const [lecturaRows] = await db.query(
+      `SELECT fecha_lectura
+       FROM registro_lecturas
+       WHERE usuario_id = ? AND publicacion_id = ?
+       ORDER BY fecha_lectura DESC
+       LIMIT 1`,
       [req.user.id, publicacion_id]
+    );
+    const lecturaPrev = lecturaRows[0]?.fecha_lectura ? new Date(lecturaRows[0].fecha_lectura) : null;
+    const fechaActualizacionLectura = pubRows[0]?.fecha_actualizacion_lectura ? new Date(pubRows[0].fecha_actualizacion_lectura) : null;
+    const puntoLecturaVigente = fechaActualizacionLectura || fechaPub;
+
+    if (lecturaPrev && lecturaPrev >= puntoLecturaVigente) {
+      return res.json({ success: true, already_confirmed: true });
+    }
+
+    const esReconfirmacion = Boolean(
+      lecturaPrev &&
+      fechaActualizacionLectura &&
+      lecturaPrev < fechaActualizacionLectura
+    );
+    const tipoConfirmacion = esReconfirmacion ? 'reconfirmacion' : 'confirmacion';
+
+    await db.query(
+      `INSERT INTO registro_lecturas (usuario_id, publicacion_id, tipo_confirmacion, oculto_reporte, oculto_reporte_at)
+       VALUES (?, ?, ?, 0, NULL)`,
+      [req.user.id, publicacion_id, tipoConfirmacion]
     );
     res.json({ success: true });
   } catch (error) {
@@ -1179,10 +1217,16 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
           WHEN COALESCE(p.eliminada, 0) = 1 THEN CONCAT(p.titulo, ' (eliminado)')
           ELSE p.titulo
         END AS publicacion, 
-        r.fecha_lectura
+        r.fecha_lectura,
+        r.tipo_confirmacion,
+        CASE
+          WHEN r.tipo_confirmacion = 'reconfirmacion' THEN 'Reconfirmaciones'
+          ELSE 'Confirmaciones iniciales'
+        END AS categoria_auditoria
       FROM registro_lecturas r
       INNER JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN publicaciones p ON r.publicacion_id = p.id
+      WHERE COALESCE(r.oculto_reporte, 0) = 0
       ORDER BY r.fecha_lectura DESC`
     );
     res.json(rows);
@@ -1194,7 +1238,10 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
 app.delete('/api/reportes/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await db.query('DELETE FROM registro_lecturas WHERE id = ?', [id]);
+    const [result] = await db.query(
+      'UPDATE registro_lecturas SET oculto_reporte = 1, oculto_reporte_at = NOW() WHERE id = ? AND COALESCE(oculto_reporte, 0) = 0',
+      [id]
+    );
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Registro no encontrado' });
     }
