@@ -583,12 +583,12 @@ function RegistroEmpleado() {
               </div>
             </div>
 
-            <div className="mb-5">
-              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-                <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
+            <div className="mb-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <p className={`text-xs tracking-normal leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
 
                 <div className="w-full lg:w-[360px]">
-                  <label className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
+                  <label className={`text-[10px] uppercase tracking-normal font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
                   <div className="mt-1 flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
