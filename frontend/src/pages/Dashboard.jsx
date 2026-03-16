@@ -104,7 +104,7 @@ function Dashboard() {
         usuario_id: usuario.id,
         publicacion_id: pubId
       });
-      toast.success(esReconfirmacion ? 'Reconfirmacion confirmada' : 'Lectura confirmada', { id: loadingToast });
+      toast.success(esReconfirmacion ? 'Lectura reconfirmada' : 'Lectura confirmada', { id: loadingToast });
       cargarPublicaciones();
     } catch (error) {
       const status = error?.response?.status;
