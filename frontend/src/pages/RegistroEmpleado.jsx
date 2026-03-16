@@ -47,6 +47,15 @@ function RegistroEmpleado() {
     cargarUsuarios();
   }, []);
 
+  useEffect(() => {
+    if (!formOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [formOpen]);
+
   const cargarUsuarios = async () => {
     try {
       const { data } = await axios.get(apiUrl('/api/usuarios'));

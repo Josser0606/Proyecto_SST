@@ -6,16 +6,11 @@ const fs = require('fs');
 require('dotenv').config();
 const { v2: cloudinary } = require('cloudinary');
 const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const iniciarTareas = require('./tareas');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const trustProxySetting = process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : '0');
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim())
@@ -26,20 +21,6 @@ const useCloudinary = Boolean(
   (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
 );
 const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
-const jwtSecret = process.env.JWT_SECRET || 'change-me';
-const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
-const authHeaderName = process.env.AUTH_HEADER_NAME || 'authorization';
-const loginRateLimitWindowMs = Math.max(Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000), 1000);
-const loginRateLimitMax = Math.max(Number(process.env.LOGIN_RATE_LIMIT_MAX || 30), 1);
-const apiRateLimitWindowMs = Math.max(Number(process.env.API_RATE_LIMIT_WINDOW_MS || 5 * 60 * 1000), 1000);
-const apiRateLimitMax = Math.max(Number(process.env.API_RATE_LIMIT_MAX || 600), 10);
-const loginMaxAttempts = Math.max(Number(process.env.LOGIN_MAX_ATTEMPTS || 5), 1);
-const loginLockMinutes = Math.max(Number(process.env.LOGIN_LOCK_MINUTES || 15), 1);
-const cloudinaryAuthMode = process.env.CLOUDINARY_URL
-  ? 'url'
-  : (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
-    ? 'keys'
-    : 'none';
 const emailNotificationsEnabled = process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'false';
 const smtpConfigured = Boolean(
   process.env.SMTP_HOST &&
@@ -85,9 +66,6 @@ if (useCloudinary) {
   }
 }
 
-console.log(`Cloudinary enabled: ${useCloudinary} (auth: ${cloudinaryAuthMode}, folder: ${cloudinaryFolder})`);
-app.set('trust proxy', trustProxySetting);
-
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
@@ -103,31 +81,8 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   }
 }));
-const loginLimiter = rateLimit({
-  windowMs: loginRateLimitWindowMs,
-  max: loginRateLimitMax,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    res.status(429).json({ success: false, message: 'Demasiados intentos de inicio de sesion. Intenta de nuevo en unos minutos.' });
-  }
-});
-const apiLimiter = rateLimit({
-  windowMs: apiRateLimitWindowMs,
-  max: apiRateLimitMax,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => req.path === '/login' || req.originalUrl.startsWith('/api/login'),
-  handler: (req, res) => {
-    res.status(429).json({ success: false, message: 'Demasiadas solicitudes. Espera unos segundos e intenta nuevamente.' });
-  }
-});
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
-}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api', apiLimiter);
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -157,58 +112,6 @@ const parseJsonArray = (value) => {
 };
 
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
-const normalizeText = (value) =>
-  String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
-
-const isHashedPassword = (value) => typeof value === 'string' && value.startsWith('$2');
-
-const signToken = (payload) => jwt.sign(payload, jwtSecret, { expiresIn: jwtExpiresIn });
-
-const getAuthToken = (req) => {
-  const header = req.headers[authHeaderName];
-  if (!header || typeof header !== 'string') return null;
-  const [scheme, token] = header.split(' ');
-  if (scheme?.toLowerCase() !== 'bearer') return null;
-  return token || null;
-};
-
-const requireAuth = (req, res, next) => {
-  const token = getAuthToken(req);
-  if (!token) return res.status(401).json({ success: false, message: 'TOKEN_REQUIRED' });
-  try {
-    req.user = jwt.verify(token, jwtSecret);
-    return next();
-  } catch {
-    return res.status(401).json({ success: false, message: 'TOKEN_INVALID' });
-  }
-};
-
-const requireAdmin = (req, res, next) => {
-  if (req.user?.rol !== 'admin') {
-    return res.status(403).json({ success: false, message: 'ADMIN_REQUIRED' });
-  }
-  return next();
-};
-
-const registerFailedLogin = async (userId, attemptsSoFar) => {
-  const attempts = Math.max(Number(attemptsSoFar || 0) + 1, 1);
-  const lockUntil = attempts >= loginMaxAttempts
-    ? toMySqlDatetime(new Date(Date.now() + loginLockMinutes * 60 * 1000))
-    : null;
-  await db.query(
-    'UPDATE usuarios SET failed_login_attempts = ?, lock_until = ? WHERE id = ?',
-    [attempts, lockUntil, userId]
-  );
-  const remaining = Math.max(loginMaxAttempts - attempts, 0);
-  const msg = lockUntil
-    ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
-    : `Te quedan ${remaining} intento(s).`;
-  return { remaining, message: msg, locked: Boolean(lockUntil) };
-};
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value));
 
 const sanitizeHtml = (value) => String(value || '')
@@ -403,32 +306,6 @@ const startEmailQueueWorker = async () => {
   }, emailQueuePollMs);
 };
 
-const getClientIp = (req) => {
-  const xf = req.headers['x-forwarded-for'];
-  if (typeof xf === 'string' && xf.length > 0) return xf.split(',')[0].trim();
-  return req.ip;
-};
-
-const logAudit = async ({ userId, action, entity, entityId, metadata, req }) => {
-  try {
-    await db.query(
-      `INSERT INTO audit_logs (user_id, action, entity, entity_id, ip, user_agent, metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        userId || null,
-        action,
-        entity,
-        entityId || null,
-        getClientIp(req),
-        req.headers['user-agent'] || null,
-        metadata ? JSON.stringify(metadata) : null
-      ]
-    );
-  } catch (error) {
-    console.error('Audit log error:', error.message);
-  }
-};
-
 const isCloudinaryUrl = (url) => typeof url === 'string' && url.includes('res.cloudinary.com');
 
 const getCloudinaryResourceType = (url) => {
@@ -545,16 +422,6 @@ const initSchema = async () => {
   } catch (error) {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
   }
-  try {
-    await db.query('ALTER TABLE usuarios ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0');
-  } catch (error) {
-    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
-  }
-  try {
-    await db.query('ALTER TABLE usuarios ADD COLUMN lock_until DATETIME NULL');
-  } catch (error) {
-    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
-  }
 
   try {
     await db.query('CREATE UNIQUE INDEX uq_usuarios_email ON usuarios(email)');
@@ -581,26 +448,6 @@ const initSchema = async () => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NULL,
-      action VARCHAR(64) NOT NULL,
-      entity VARCHAR(64) NOT NULL,
-      entity_id INT NULL,
-      ip VARCHAR(64) NULL,
-      user_agent VARCHAR(255) NULL,
-      metadata JSON NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  try {
-    await db.query('CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at)');
-  } catch (error) {
-    if (error.code !== 'ER_DUP_KEYNAME') throw error;
-  }
 
   try {
     await db.query('CREATE INDEX idx_email_queue_status_next ON email_queue(status, next_attempt_at)');
@@ -651,98 +498,45 @@ app.get('/', (req, res) => {
   res.send('Servidor SACIAR activo');
 });
 
-app.post('/api/login', loginLimiter, async (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { nombre, area, password } = req.body;
   if (!nombre || !area) {
     return res.status(400).json({ success: false, message: 'Nombre y area son obligatorios' });
   }
 
   try {
-    const areaNormalizada = normalizeText(area);
-    const nombreNormalizado = normalizeText(nombre);
     const [usuarios] = await db.query(
-      `SELECT id, nombre_completo, area, rol, password, failed_login_attempts, lock_until
-       FROM usuarios`
+      `SELECT id, nombre_completo, area, rol, password
+       FROM usuarios
+       WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ?`,
+      [String(nombre).trim().toLowerCase(), String(area).trim().toLowerCase()]
     );
 
-    const candidatos = usuarios.filter((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
-    const user = candidatos.find((u) => normalizeText(u.area) === areaNormalizada);
-    if (!user) {
-      if (candidatos.length === 1) {
-        const attempt = await registerFailedLogin(candidatos[0].id, candidatos[0].failed_login_attempts);
-        return res.status(403).json({
-          success: false,
-          message: `Area incorrecta. Verifica tu area registrada. ${attempt.message}`,
-          remaining_attempts: attempt.remaining
-        });
-      }
+    if (usuarios.length === 0) {
       return res.status(403).json({
         success: false,
-        message: candidatos.length > 0
-          ? 'Area incorrecta. Verifica tu area registrada.'
-          : 'Usuario no autorizado. Solicita al administrador agregar tu registro.'
+        message: 'Usuario no autorizado. Solicita al administrador agregar tu registro.'
       });
     }
 
-    if (user.lock_until && new Date(user.lock_until) > new Date()) {
-      return res.status(423).json({
-        success: false,
-        message: 'Cuenta bloqueada temporalmente. Intenta mas tarde.'
-      });
-    }
-
+    const user = usuarios[0];
     if (user.rol === 'admin') {
-      if (!password) {
-        return res.status(401).json({
-          success: false,
-          message: 'REQUIRES_PASSWORD'
-        });
-      }
-      const stored = String(user.password || '');
-      const incoming = String(password);
-      if (isHashedPassword(stored)) {
-        const ok = await bcrypt.compare(incoming, stored);
-        if (!ok) {
-          const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
-          const msg = attempt.locked
-            ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
-            : `Contrasena incorrecta. ${attempt.message}`;
-          return res.status(403).json({ success: false, message: msg, remaining_attempts: attempt.remaining });
-        }
-      } else {
-        if (stored !== incoming) {
-          const attempt = await registerFailedLogin(user.id, user.failed_login_attempts);
-          const msg = attempt.locked
-            ? `Cuenta bloqueada por ${loginLockMinutes} minutos.`
-            : `Contrasena incorrecta. ${attempt.message}`;
-          return res.status(403).json({ success: false, message: msg, remaining_attempts: attempt.remaining });
-        }
-        const hashed = await bcrypt.hash(incoming, 10);
-        await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [hashed, user.id]);
+      if (!password) return res.status(401).json({ success: false, message: 'REQUIRES_PASSWORD' });
+      if (String(user.password || '') !== String(password)) {
+        return res.status(403).json({ success: false, message: 'Contrasena de administrador incorrecta' });
       }
     }
-
-    await db.query('UPDATE usuarios SET failed_login_attempts = 0, lock_until = NULL WHERE id = ?', [user.id]);
-    await logAudit({
-      userId: user.id,
-      action: 'login',
-      entity: 'user',
-      entityId: user.id,
-      metadata: { area: user.area, rol: user.rol },
-      req
-    });
 
     return res.json({
       success: true,
-      usuario: { id: user.id, nombre_completo: user.nombre_completo, area: user.area, rol: user.rol },
-      token: signToken({ id: user.id, rol: user.rol })
+      usuario: { id: user.id, nombre_completo: user.nombre_completo, area: user.area, rol: user.rol }
     });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.get('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
+app.get('/api/usuarios', async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
@@ -755,7 +549,7 @@ app.get('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
+app.post('/api/usuarios', async (req, res) => {
   const { nombre_completo, area, rol = 'empleado', password = null, email = null, notificar_email = true } = req.body;
   if (!nombre_completo || !area) {
     return res.status(400).json({ success: false, message: 'Nombre y area son obligatorios' });
@@ -773,12 +567,11 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
 
   try {
     const [existente] = await db.query(
-      `SELECT id, nombre_completo FROM usuarios`
+      `SELECT id FROM usuarios WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ?`,
+      [String(nombre_completo).trim().toLowerCase(), String(area).trim().toLowerCase()]
     );
-    const nombreNormalizado = normalizeText(nombre_completo);
-    const duplicadoNombre = existente.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
-    if (duplicadoNombre) {
-      return res.status(409).json({ success: false, message: 'Ya existe un usuario con ese nombre completo' });
+    if (existente.length > 0) {
+      return res.status(409).json({ success: false, message: 'Ya existe un usuario con ese nombre y area' });
     }
     if (emailNormalizado) {
       const [correoExistente] = await db.query(
@@ -790,26 +583,17 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
       }
     }
 
-    const hashedPassword = rol === 'admin' && password ? await bcrypt.hash(String(password), 10) : null;
     const [result] = await db.query(
       'INSERT INTO usuarios (nombre_completo, area, rol, password, email, notificar_email) VALUES (?, ?, ?, ?, ?, ?)',
       [
         String(nombre_completo).trim(),
         String(area).trim(),
         rol,
-        hashedPassword,
+        rol === 'admin' ? String(password) : null,
         emailNormalizado || null,
         notificar_email ? 1 : 0
       ]
     );
-    await logAudit({
-      userId: req.user?.id,
-      action: 'user.create',
-      entity: 'user',
-      entityId: result.insertId,
-      metadata: { rol, area: String(area).trim() },
-      req
-    });
     res.status(201).json({
       success: true,
       usuario: {
@@ -826,7 +610,7 @@ app.post('/api/usuarios', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
+app.put('/api/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   const { nombre_completo, area, rol, password, email = null, notificar_email = true } = req.body;
   if (!nombre_completo || !area || !rol) {
@@ -839,13 +623,11 @@ app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
 
   try {
     const [duplicados] = await db.query(
-      `SELECT id, nombre_completo FROM usuarios WHERE id <> ?`,
-      [id]
+      `SELECT id FROM usuarios WHERE LOWER(TRIM(nombre_completo)) = ? AND LOWER(TRIM(area)) = ? AND id <> ?`,
+      [String(nombre_completo).trim().toLowerCase(), String(area).trim().toLowerCase(), id]
     );
-    const nombreNormalizado = normalizeText(nombre_completo);
-    const duplicadoNombre = duplicados.find((u) => normalizeText(u.nombre_completo) === nombreNormalizado);
-    if (duplicadoNombre) {
-      return res.status(409).json({ success: false, message: 'Ya existe otro usuario con ese nombre completo' });
+    if (duplicados.length > 0) {
+      return res.status(409).json({ success: false, message: 'Ya existe otro usuario con ese nombre y area' });
     }
     if (emailNormalizado) {
       const [correoDuplicado] = await db.query(
@@ -859,10 +641,9 @@ app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
 
     if (rol === 'admin') {
       if (password) {
-        const hashed = await bcrypt.hash(String(password), 10);
         await db.query(
           'UPDATE usuarios SET nombre_completo = ?, area = ?, rol = ?, password = ?, email = ?, notificar_email = ? WHERE id = ?',
-          [String(nombre_completo).trim(), String(area).trim(), rol, hashed, emailNormalizado || null, notificar_email ? 1 : 0, id]
+          [String(nombre_completo).trim(), String(area).trim(), rol, String(password), emailNormalizado || null, notificar_email ? 1 : 0, id]
         );
       } else {
         await db.query(
@@ -876,49 +657,34 @@ app.put('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
         [String(nombre_completo).trim(), String(area).trim(), rol, emailNormalizado || null, notificar_email ? 1 : 0, id]
       );
     }
-    await logAudit({
-      userId: req.user?.id,
-      action: 'user.update',
-      entity: 'user',
-      entityId: Number(id),
-      metadata: { rol, area: String(area).trim() },
-      req
-    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await db.query('UPDATE publicaciones SET autor_id = NULL WHERE autor_id = ?', [id]);
     await db.query('DELETE FROM registro_lecturas WHERE usuario_id = ?', [id]);
     await db.query('DELETE FROM usuarios WHERE id = ?', [id]);
-    await logAudit({
-      userId: req.user?.id,
-      action: 'user.delete',
-      entity: 'user',
-      entityId: Number(id),
-      req
-    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/publicaciones', requireAuth, async (req, res) => {
+app.get('/api/publicaciones', async (req, res) => {
   try {
-    const rows = await getPublicacionesWithRecursos(req.user?.id || 0);
+    const rows = await getPublicacionesWithRecursos(req.query.usuario_id || 0);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/publicaciones', requireAuth, requireAdmin, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
+app.post('/api/publicaciones', upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
   const { titulo, contenido, categoria, autor_id } = req.body;
   const imagen = req.files?.imagen?.[0];
   const imagenesNuevas = req.files?.imagenes || [];
@@ -985,21 +751,13 @@ app.post('/api/publicaciones', requireAuth, requireAdmin, upload.fields([{ name:
     });
     if (encolados > 0) void processEmailQueue();
 
-    await logAudit({
-      userId: req.user?.id,
-      action: 'publication.create',
-      entity: 'publication',
-      entityId: publicacionId,
-      metadata: { categoria, titulo },
-      req
-    });
     res.json({ success: true, id: publicacionId, notificaciones_encoladas: encolados });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.put('/api/publicaciones/:id', requireAuth, requireAdmin, upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
+app.put('/api/publicaciones/:id', upload.fields([{ name: 'imagen', maxCount: 1 }, { name: 'imagenes', maxCount: 15 }, { name: 'archivos', maxCount: 15 }]), async (req, res) => {
   const { id } = req.params;
   const { titulo, contenido, categoria } = req.body;
   const imagenNueva = req.files?.imagen?.[0];
@@ -1062,21 +820,13 @@ app.put('/api/publicaciones/:id', requireAuth, requireAdmin, upload.fields([{ na
       );
     }
 
-    await logAudit({
-      userId: req.user?.id,
-      action: 'publication.update',
-      entity: 'publication',
-      entityId: Number(id),
-      metadata: { categoria, titulo },
-      req
-    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/publicaciones/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const [pubRows] = await db.query('SELECT imagen_url FROM publicaciones WHERE id = ?', [id]);
@@ -1088,30 +838,23 @@ app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res)
 
     await db.query('DELETE FROM publicacion_recursos WHERE publicacion_id = ?', [id]);
     await db.query('UPDATE publicaciones SET eliminada = 1, imagen_url = NULL WHERE id = ?', [id]);
-    await logAudit({
-      userId: req.user?.id,
-      action: 'publication.delete',
-      entity: 'publication',
-      entityId: Number(id),
-      req
-    });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.post('/api/registrar-vista', requireAuth, async (req, res) => {
-  const { publicacion_id } = req.body;
+app.post('/api/registrar-vista', async (req, res) => {
+  const { usuario_id, publicacion_id } = req.body;
   try {
-    await db.query('INSERT IGNORE INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)', [req.user.id, publicacion_id]);
+    await db.query('INSERT IGNORE INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)', [usuario_id, publicacion_id]);
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
+app.get('/api/reportes', async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT 
@@ -1122,8 +865,7 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
           WHEN COALESCE(p.eliminada, 0) = 1 THEN CONCAT(p.titulo, ' (eliminado)')
           ELSE p.titulo
         END AS publicacion, 
-        r.fecha_lectura,
-        DATE_SUB(r.fecha_lectura, INTERVAL 5 HOUR) AS fecha_lectura_local
+        r.fecha_lectura
       FROM registro_lecturas r
       INNER JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN publicaciones p ON r.publicacion_id = p.id
@@ -1135,27 +877,20 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-app.delete('/api/reportes/:id', requireAuth, requireAdmin, async (req, res) => {
+app.delete('/api/reportes/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await db.query('DELETE FROM registro_lecturas WHERE id = ?', [id]);
     if (!result.affectedRows) {
       return res.status(404).json({ success: false, message: 'Registro no encontrado' });
     }
-    await logAudit({
-      userId: req.user?.id,
-      action: 'report.delete',
-      entity: 'report',
-      entityId: Number(id),
-      req
-    });
     return res.json({ success: true });
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
 });
 
-app.get('/api/stats', requireAuth, requireAdmin, async (req, res) => {
+app.get('/api/stats', async (req, res) => {
   try {
     const [totalPubs] = await db.query('SELECT COUNT(*) AS total FROM publicaciones');
     const [totalLecturas] = await db.query('SELECT COUNT(*) AS total FROM registro_lecturas');

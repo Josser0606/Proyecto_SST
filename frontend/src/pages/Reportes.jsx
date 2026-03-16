@@ -34,7 +34,8 @@ function Reportes() {
     if (typeof fecha === 'string') {
       const limpio = fecha.trim().replace(' ', 'T');
       const sinZona = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/;
-      // MySQL DATETIME suele venir sin zona; se interpreta como UTC para evitar desfase.
+      // MySQL DATETIME suele venir sin zona; se interpreta como UTC para convertirlo
+      // correctamente al reloj local del dispositivo al formatear.
       return new Date(sinZona.test(limpio) ? `${limpio}Z` : limpio);
     }
     return new Date(fecha);
@@ -100,7 +101,7 @@ function Reportes() {
   const conteoPorFecha = useMemo(() => {
     const acc = {};
     datosFiltrados.forEach((reg) => {
-      const d = parseFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura);
+      const d = parseFechaLectura(reg.fecha_lectura);
       if (!d || Number.isNaN(d.getTime())) return;
       const key = toLocalYmd(d);
       acc[key] = (acc[key] || 0) + 1;
@@ -131,7 +132,7 @@ function Reportes() {
   const publicacionesPorFechaSeleccionada = useMemo(() => {
     if (!fechaCalendarioSeleccionada) return [];
     return datosFiltrados.filter((reg) => {
-      const d = parseFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura);
+      const d = parseFechaLectura(reg.fecha_lectura);
       if (!d || Number.isNaN(d.getTime())) return false;
       return toLocalYmd(d) === fechaCalendarioSeleccionada;
     });
@@ -228,7 +229,7 @@ function Reportes() {
       comunicado: reg.publicacion || '',
       empleado: reg.empleado || '',
       area: reg.area || '',
-      fecha_confirmacion: formatearFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura)
+      fecha_confirmacion: formatearFechaLectura(reg.fecha_lectura)
     }));
 
     const tablaHtml = construirTablaHtml(normalizados);
@@ -725,7 +726,7 @@ function Reportes() {
                               </span>
                               <div className="flex items-center gap-2">
                                 <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {formatearFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura)}
+                                  {formatearFechaLectura(reg.fecha_lectura)}
                                 </span>
                                 <button
                                   type="button"
@@ -762,7 +763,7 @@ function Reportes() {
                       </span>
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {formatearFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura)}
+                          {formatearFechaLectura(reg.fecha_lectura)}
                         </span>
                         <button
                           type="button"
@@ -846,7 +847,7 @@ function Reportes() {
                                   </span>
                                 </td>
                                 <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {formatearFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura)}
+                                  {formatearFechaLectura(reg.fecha_lectura)}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                   <button
@@ -896,7 +897,7 @@ function Reportes() {
                           </span>
                         </td>
                         <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {formatearFechaLectura(reg.fecha_lectura_local || reg.fecha_lectura)}
+                          {formatearFechaLectura(reg.fecha_lectura)}
                         </td>
                         <td className="px-8 py-5 text-right">
                           <button
