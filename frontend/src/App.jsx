@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastBar } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -76,7 +76,7 @@ function App() {
             color: '#0f172a',
             boxShadow: '0 10px 30px rgba(20, 83, 45, 0.16)',
             fontWeight: 700,
-            pointerEvents: 'none'
+            pointerEvents: 'auto'
           },
           success: {
             style: { border: '1px solid #86efac' }
@@ -85,7 +85,27 @@ function App() {
             style: { border: '1px solid #fca5a5' }
           }
         }}
-      />
+      >
+        {(t) => (
+          <ToastBar toast={t}>
+            {({ icon, message }) => (
+              <div className="flex items-center gap-2 w-full">
+                <span>{icon}</span>
+                <span className="flex-1">{message}</span>
+                <button
+                  type="button"
+                  onClick={() => toast.dismiss(t.id)}
+                  className="ml-1 rounded-md border border-slate-200 px-2 py-0.5 text-xs font-black text-slate-500 hover:text-red-600 hover:border-red-200 transition-colors"
+                  aria-label="Cerrar notificacion"
+                  title="Cerrar"
+                >
+                  X
+                </button>
+              </div>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
       <Routes>
         {/* Ruta por defecto: Login */}
         <Route path="/" element={<Login />} />

@@ -261,8 +261,34 @@ function Reportes() {
     descargarArchivo(excelHtml, 'application/vnd.ms-excel;charset=utf-8', 'xls');
   };
 
+  const confirmarAccion = (mensaje) => new Promise((resolve) => {
+    toast((t) => (
+      <div className="flex items-center gap-3">
+        <span className="text-sm">{mensaje}</span>
+        <button
+          className="px-2 py-1 text-xs rounded bg-red-600 text-white"
+          onClick={() => {
+            toast.dismiss(t.id);
+            resolve(true);
+          }}
+        >
+          Si
+        </button>
+        <button
+          className="px-2 py-1 text-xs rounded border"
+          onClick={() => {
+            toast.dismiss(t.id);
+            resolve(false);
+          }}
+        >
+          No
+        </button>
+      </div>
+    ), { duration: 8000, style: { pointerEvents: 'auto' } });
+  });
+
   const eliminarReporte = async (id) => {
-    const confirmado = window.confirm('Seguro que deseas eliminar este registro de auditoria?');
+    const confirmado = await confirmarAccion('Seguro que deseas eliminar este registro de auditoria?');
     if (!confirmado) return;
 
     try {

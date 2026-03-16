@@ -138,7 +138,7 @@ function Dashboard() {
   });
 
   const cerrarSesion = async () => {
-    const confirmado = window.confirm('Seguro que deseas cerrar sesion?');
+    const confirmado = await confirmarAccion('Seguro que deseas cerrar sesion?');
     if (!confirmado) return;
     toast.dismiss();
     localStorage.clear();
