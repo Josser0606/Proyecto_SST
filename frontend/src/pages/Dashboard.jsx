@@ -106,8 +106,14 @@ function Dashboard() {
       });
       toast.success('Lectura confirmada', { id: loadingToast });
       cargarPublicaciones();
-    } catch {
-      toast.error('Error al registrar', { id: loadingToast });
+    } catch (error) {
+      const status = error?.response?.status;
+      const msg = error?.response?.data?.message;
+      if (status === 410) {
+        toast.error(msg || 'El plazo para confirmar lectura ya vencio.', { id: loadingToast });
+      } else {
+        toast.error(msg || 'Error al registrar', { id: loadingToast });
+      }
     }
   };
 
@@ -487,6 +493,17 @@ function Dashboard() {
             {publicacionesFiltradas.map((pub) => {
               const imagenesSecundarias = (pub.recursos || []).filter((r) => r.tipo === 'imagen');
               const otrosRecursos = (pub.recursos || []).filter((r) => r.tipo !== 'imagen');
+              const leidoVigente = Number(pub.leido) > 0;
+              const requiereReconfirmacion = Number(pub.requiere_reconfirmacion) > 0;
+              const puedeConfirmarLectura = Number(pub.puede_confirmar_lectura) > 0;
+              const bloqueoPorPlazo = !leidoVigente && !puedeConfirmarLectura;
+              const etiquetaLectura = leidoVigente
+                ? 'Leido'
+                : bloqueoPorPlazo
+                  ? 'Plazo vencido'
+                  : requiereReconfirmacion
+                    ? 'Reconfirmar lectura'
+                    : 'Confirmar lectura';
               return (
               <article key={pub.id} className={`rounded-[2.5rem] overflow-hidden border transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
                 {pub.imagen_url && (
@@ -588,8 +605,17 @@ function Dashboard() {
                   )}
 
                   <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-8 border-t ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
-                    <button onClick={() => !pub.leido && marcarComoLeido(pub.id)} disabled={pub.leido > 0} className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${pub.leido > 0 ? (darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-300') : 'bg-green-600 text-white shadow-xl hover:bg-green-700 hover:-translate-y-1'}`}>
-                      {pub.leido > 0 ? 'Leido' : 'Confirmar Lectura'}
+                    <button
+                      onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id)}
+                      disabled={leidoVigente || bloqueoPorPlazo}
+                      className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        leidoVigente || bloqueoPorPlazo
+                          ? (darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-300')
+                          : 'bg-green-600 text-white shadow-xl hover:bg-green-700 hover:-translate-y-1'
+                      }`}
+                      title={bloqueoPorPlazo ? 'El plazo de confirmacion ya vencio' : ''}
+                    >
+                      {etiquetaLectura}
                     </button>
 
                     {usuario?.rol === 'admin' && editandoId !== pub.id && (

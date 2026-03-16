@@ -35,6 +35,7 @@ const apiRateLimitWindowMs = Math.max(Number(process.env.API_RATE_LIMIT_WINDOW_M
 const apiRateLimitMax = Math.max(Number(process.env.API_RATE_LIMIT_MAX || 600), 10);
 const loginMaxAttempts = Math.max(Number(process.env.LOGIN_MAX_ATTEMPTS || 5), 1);
 const loginLockMinutes = Math.max(Number(process.env.LOGIN_LOCK_MINUTES || 15), 1);
+const readConfirmWindowDays = Math.max(Number(process.env.READ_CONFIRM_WINDOW_DAYS || 2), 1);
 const cloudinaryAuthMode = process.env.CLOUDINARY_URL
   ? 'url'
   : (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
@@ -533,6 +534,11 @@ const initSchema = async () => {
   } catch (error) {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
   }
+  try {
+    await db.query('ALTER TABLE publicaciones ADD COLUMN fecha_actualizacion_lectura DATETIME NULL');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
 
   try {
     await db.query('ALTER TABLE usuarios ADD COLUMN email VARCHAR(255) NULL');
@@ -618,11 +624,34 @@ const initSchema = async () => {
 const getPublicacionesWithRecursos = async (usuarioId) => {
   const [publicaciones] = await db.query(
     `SELECT p.*,
-    (SELECT COUNT(*) FROM registro_lecturas rl WHERE rl.publicacion_id = p.id AND rl.usuario_id = ?) AS leido
+    rl.ultima_lectura,
+    CASE
+      WHEN rl.ultima_lectura IS NOT NULL
+        AND rl.ultima_lectura >= COALESCE(p.fecha_actualizacion_lectura, p.fecha_publicacion)
+      THEN 1
+      ELSE 0
+    END AS leido,
+    CASE
+      WHEN rl.ultima_lectura IS NOT NULL
+        AND p.fecha_actualizacion_lectura IS NOT NULL
+        AND rl.ultima_lectura < p.fecha_actualizacion_lectura
+      THEN 1
+      ELSE 0
+    END AS requiere_reconfirmacion,
+    CASE
+      WHEN NOW() <= DATE_ADD(p.fecha_publicacion, INTERVAL ? DAY) THEN 1
+      ELSE 0
+    END AS puede_confirmar_lectura
     FROM publicaciones p
+    LEFT JOIN (
+      SELECT publicacion_id, MAX(fecha_lectura) AS ultima_lectura
+      FROM registro_lecturas
+      WHERE usuario_id = ?
+      GROUP BY publicacion_id
+    ) rl ON rl.publicacion_id = p.id
     WHERE COALESCE(p.eliminada, 0) = 0
     ORDER BY p.fecha_publicacion DESC`,
-    [usuarioId || 0]
+    [readConfirmWindowDays, usuarioId || 0]
   );
 
   if (publicaciones.length === 0) return [];
@@ -1019,9 +1048,15 @@ app.put('/api/publicaciones/:id', requireAuth, requireAdmin, upload.fields([{ na
       if (pubRows[0].imagen_url) await deleteFileSafe(pubRows[0].imagen_url);
       const subido = await uploadStoredFile(imagenNueva, 'imagen');
       imagenPrincipalActual = subido?.url || null;
-      await db.query('UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ?, imagen_url = ? WHERE id = ?', [titulo, contenido, categoria, imagenPrincipalActual, id]);
+      await db.query(
+        'UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ?, imagen_url = ?, fecha_actualizacion_lectura = NOW() WHERE id = ?',
+        [titulo, contenido, categoria, imagenPrincipalActual, id]
+      );
     } else {
-      await db.query('UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ? WHERE id = ?', [titulo, contenido, categoria, id]);
+      await db.query(
+        'UPDATE publicaciones SET titulo = ?, contenido = ?, categoria = ?, fecha_actualizacion_lectura = NOW() WHERE id = ?',
+        [titulo, contenido, categoria, id]
+      );
       if (!imagenPrincipalActual && imagenesNuevas.length > 0) {
         const subido = await uploadStoredFile(imagenesNuevas[0], 'imagen');
         imagenPrincipalActual = subido?.url || null;
@@ -1104,7 +1139,29 @@ app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res)
 app.post('/api/registrar-vista', requireAuth, async (req, res) => {
   const { publicacion_id } = req.body;
   try {
-    await db.query('INSERT IGNORE INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)', [req.user.id, publicacion_id]);
+    const [pubRows] = await db.query(
+      'SELECT id, fecha_publicacion FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+      [publicacion_id]
+    );
+    if (!pubRows.length) {
+      return res.status(404).json({ success: false, message: 'Publicacion no encontrada' });
+    }
+
+    const fechaPub = new Date(pubRows[0].fecha_publicacion);
+    const limite = new Date(fechaPub.getTime() + readConfirmWindowDays * 24 * 60 * 60 * 1000);
+    if (new Date() > limite) {
+      return res.status(410).json({
+        success: false,
+        message: `El plazo para confirmar lectura vencio (${readConfirmWindowDays} dias desde la publicacion).`
+      });
+    }
+
+    await db.query(
+      `INSERT INTO registro_lecturas (usuario_id, publicacion_id)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE fecha_lectura = CURRENT_TIMESTAMP`,
+      [req.user.id, publicacion_id]
+    );
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });
