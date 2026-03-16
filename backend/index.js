@@ -1269,7 +1269,29 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
         [req.user.id, publicacion_id, tipoConfirmacion]
       );
     } catch (insertError) {
-      if (['ER_BAD_FIELD_ERROR', 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD', 'ER_TRUNCATED_WRONG_VALUE'].includes(insertError.code)) {
+      if (insertError.code === 'ER_DUP_ENTRY') {
+        // Compatibilidad con esquemas que tienen clave unica (usuario_id, publicacion_id).
+        try {
+          await db.query(
+            `UPDATE registro_lecturas
+             SET fecha_lectura = NOW(),
+                 tipo_confirmacion = ?,
+                 oculto_reporte = 0,
+                 oculto_reporte_at = NULL
+             WHERE usuario_id = ? AND publicacion_id = ?`,
+            [tipoConfirmacion, req.user.id, publicacion_id]
+          );
+        } catch (updateError) {
+          if (updateError.code === 'ER_BAD_FIELD_ERROR') {
+            await db.query(
+              'UPDATE registro_lecturas SET fecha_lectura = NOW() WHERE usuario_id = ? AND publicacion_id = ?',
+              [req.user.id, publicacion_id]
+            );
+          } else {
+            throw updateError;
+          }
+        }
+      } else if (['ER_BAD_FIELD_ERROR', 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD', 'ER_TRUNCATED_WRONG_VALUE'].includes(insertError.code)) {
         await db.query(
           'INSERT INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)',
           [req.user.id, publicacion_id]
