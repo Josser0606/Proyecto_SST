@@ -95,11 +95,13 @@ function App() {
                 <button
                   type="button"
                   onClick={() => toast.dismiss(t.id)}
-                  className="ml-1 rounded-md border border-slate-200 px-2 py-0.5 text-xs font-black text-slate-500 hover:text-red-600 hover:border-red-200 transition-colors"
+                  className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
                   aria-label="Cerrar notificacion"
                   title="Cerrar"
                 >
-                  X
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M6 6l8 8M14 6l-8 8" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
                 </button>
               </div>
             )}

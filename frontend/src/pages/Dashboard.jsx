@@ -143,7 +143,7 @@ function Dashboard() {
     toast.dismiss();
     localStorage.clear();
     setAuthToken(null);
-    toast.success('Sesion cerrada');
+    toast.success('Sesion cerrada correctamente', { id: 'logout-success' });
     navigate('/');
   };
 
