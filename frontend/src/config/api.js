@@ -31,4 +31,10 @@ export const setAuthToken = (token) => {
   delete axios.defaults.headers.common.Authorization;
 };
 
+// Evita condiciones de carrera al recargar: deja el header listo desde el arranque.
+if (typeof window !== 'undefined') {
+  const bootToken = localStorage.getItem('token');
+  if (bootToken) setAuthToken(bootToken);
+}
+
 export { API_BASE_URL };

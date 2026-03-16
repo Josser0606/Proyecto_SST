@@ -57,7 +57,7 @@ function Dashboard() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const cargarPublicaciones = useCallback(async () => {
+  const cargarPublicaciones = useCallback(async (allowRetry = true) => {
     if (!usuario?.id || cargandoPublicacionesRef.current) return;
     cargandoPublicacionesRef.current = true;
     try {
@@ -68,6 +68,13 @@ function Dashboard() {
       if (status === 429) {
         toast.error('Demasiadas solicitudes. Espera unos segundos.', { id: 'dashboard-rate-limit' });
       } else if (status === 401 || status === 403) {
+        const token = localStorage.getItem('token');
+        if (allowRetry && token) {
+          setAuthToken(token);
+          cargandoPublicacionesRef.current = false;
+          await cargarPublicaciones(false);
+          return;
+        }
         toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'dashboard-auth' });
       } else {
         toast.error('Error al conectar con el servidor', { id: 'dashboard-load-error' });
