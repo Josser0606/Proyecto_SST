@@ -61,6 +61,11 @@ function RegistroEmpleado() {
     setEditandoId(null);
   };
 
+  const cerrarFormulario = () => {
+    limpiarFormulario();
+    setFormOpen(false);
+  };
+
   const validarFormulario = () => {
     if (!formData.nombre_completo.trim()) {
       toast.error('Escribe el nombre completo');
@@ -107,8 +112,7 @@ function RegistroEmpleado() {
         toast.success('Empleado agregado');
       }
 
-      limpiarFormulario();
-      setFormOpen(false);
+      cerrarFormulario();
       cargarUsuarios();
     } catch (error) {
       const mensaje = error.response?.data?.message || 'No fue posible guardar';
@@ -129,11 +133,6 @@ function RegistroEmpleado() {
       password: '',
       email: usuario.email || '',
       notificar_email: Boolean(usuario.notificar_email)
-    });
-    window.requestAnimationFrame(() => {
-      if (formRef.current) {
-        formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
     });
   };
 
@@ -372,20 +371,15 @@ function RegistroEmpleado() {
                 Gestiona el personal y abre el formulario solo cuando lo necesites.
               </p>
             </div>
-            <button
+              <button
               type="button"
               onClick={() => {
                 if (formOpen && !editandoId) {
-                  setFormOpen(false);
+                  cerrarFormulario();
                   return;
                 }
                 limpiarFormulario();
                 setFormOpen(true);
-                window.requestAnimationFrame(() => {
-                  if (formRef.current) {
-                    formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                });
               }}
               className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
                 formOpen && !editandoId
@@ -397,13 +391,32 @@ function RegistroEmpleado() {
             </button>
           </div>
 
-          <div className={`grid gap-6 ${formOpen ? 'lg:grid-cols-5' : 'grid-cols-1'}`}>
+          <div className="grid grid-cols-1 gap-6">
           {formOpen && (
-          <form ref={formRef} onSubmit={handleSubmit} className={`lg:col-span-2 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 space-y-4 ${
+          <>
+          <div
+            className="fixed inset-0 z-[80] bg-slate-900/50 backdrop-blur-[1px]"
+            onClick={cerrarFormulario}
+          ></div>
+          <form ref={formRef} onSubmit={handleSubmit} className={`fixed left-1/2 top-1/2 z-[90] w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-[1.5rem] sm:rounded-[2rem] border shadow-2xl p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
             <div className={`pb-4 border-b ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
-              <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{editandoId ? 'Editar empleado' : 'Nuevo empleado'}</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{editandoId ? 'Editar empleado' : 'Nuevo empleado'}</h2>
+                <button
+                  type="button"
+                  onClick={cerrarFormulario}
+                  className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all ${
+                    darkMode ? 'border-slate-700 text-slate-300 hover:text-white hover:border-slate-500' : 'border-gray-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                  title="Cerrar formulario"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                    <path d="M6 6l8 8M14 6l-8 8" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
               <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{editandoId ? 'Actualiza la informacion del usuario seleccionado.' : 'Completa los datos para habilitar su acceso.'}</p>
             </div>
 
@@ -507,7 +520,7 @@ function RegistroEmpleado() {
               {editandoId && (
                 <button
                   type="button"
-                  onClick={limpiarFormulario}
+                  onClick={cerrarFormulario}
                   className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-wider ${
                     darkMode ? 'border-slate-700 text-slate-300 hover:text-white hover:border-slate-500' : 'border-gray-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   }`}
@@ -518,10 +531,7 @@ function RegistroEmpleado() {
               {!editandoId && (
                 <button
                   type="button"
-                  onClick={() => {
-                    limpiarFormulario();
-                    setFormOpen(false);
-                  }}
+                  onClick={cerrarFormulario}
                   className={`px-4 py-3 rounded-xl border text-xs font-black uppercase tracking-wider ${
                     darkMode ? 'border-slate-700 text-slate-300 hover:text-white hover:border-slate-500' : 'border-gray-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   }`}
@@ -531,9 +541,10 @@ function RegistroEmpleado() {
               )}
             </div>
           </form>
+          </>
           )}
 
-          <section className={`${formOpen ? 'lg:col-span-3' : 'col-span-1'} rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 ${
+          <section className={`col-span-1 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
             <div className="mb-5">
