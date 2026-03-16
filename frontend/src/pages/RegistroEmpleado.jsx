@@ -373,33 +373,6 @@ function RegistroEmpleado() {
             </div>
           </section>
 
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
-              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Gestiona el personal y abre el formulario solo cuando lo necesites.
-              </p>
-            </div>
-              <button
-              type="button"
-              onClick={() => {
-                if (formOpen && !editandoId) {
-                  cerrarFormulario();
-                  return;
-                }
-                limpiarFormulario();
-                setFormOpen(true);
-              }}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
-                formOpen && !editandoId
-                  ? (darkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
-            >
-              {formOpen && !editandoId ? 'Ocultar formulario' : 'Crear empleado'}
-            </button>
-          </div>
-
           <div className="grid grid-cols-1 gap-6">
           {formOpen && (
           <>
@@ -556,6 +529,35 @@ function RegistroEmpleado() {
           <section className={`col-span-1 rounded-[1.5rem] sm:rounded-[2rem] border shadow-sm p-4 sm:p-6 ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
+            <div className={`pb-4 mb-5 border-b ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
+                  <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Gestiona el personal y abre el formulario solo cuando lo necesites.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (formOpen && !editandoId) {
+                      cerrarFormulario();
+                      return;
+                    }
+                    limpiarFormulario();
+                    setFormOpen(true);
+                  }}
+                  className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
+                    formOpen && !editandoId
+                      ? (darkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  {formOpen && !editandoId ? 'Ocultar formulario' : 'Crear empleado'}
+                </button>
+              </div>
+            </div>
+
             <div className="mb-5">
               <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                 <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
