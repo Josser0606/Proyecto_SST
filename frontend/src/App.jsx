@@ -13,6 +13,34 @@ import { setAuthToken } from './config/api';
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
 
+const getStoredUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('usuario') || 'null');
+  } catch {
+    return null;
+  }
+};
+
+const isAuthenticated = () => {
+  const token = localStorage.getItem('token');
+  const user = getStoredUser();
+  return Boolean(token && user?.id);
+};
+
+function PublicOnlyRoute({ children }) {
+  if (isAuthenticated()) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
+function ProtectedRoute({ children, adminOnly = false }) {
+  if (!isAuthenticated()) return <Navigate to="/" replace />;
+  if (adminOnly) {
+    const user = getStoredUser();
+    if (user?.rol !== 'admin') return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
+
 function SessionInactivityGuard() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -110,22 +138,64 @@ function App() {
       </Toaster>
       <Routes>
         {/* Ruta por defecto: Login */}
-        <Route path="/" element={<Login />} />
+        <Route
+          path="/"
+          element={(
+            <PublicOnlyRoute>
+              <Login />
+            </PublicOnlyRoute>
+          )}
+        />
         
         {/* Ruta principal: Dashboard */}
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/dashboard"
+          element={(
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          )}
+        />
 
         {/* Ruta por defecto: Admin */}
-        <Route path="/admin-reportes" element={<Admin />} />
+        <Route
+          path="/admin-reportes"
+          element={(
+            <ProtectedRoute adminOnly>
+              <Admin />
+            </ProtectedRoute>
+          )}
+        />
 
         {/* Ruta por defecto: RegistroEmpleado */}
-        <Route path="/registro-personal" element={<RegistroEmpleado />} />
+        <Route
+          path="/registro-personal"
+          element={(
+            <ProtectedRoute adminOnly>
+              <RegistroEmpleado />
+            </ProtectedRoute>
+          )}
+        />
 
         {/* Ruta por defeccto: AdminPanel */}
-        <Route path="/admin" element={<AdminPanel />} />
+        <Route
+          path="/admin"
+          element={(
+            <ProtectedRoute adminOnly>
+              <AdminPanel />
+            </ProtectedRoute>
+          )}
+        />
 
         {/* Ruta por defeccto: Reportes */}
-        <Route path="/reportes" element={<Reportes />} />
+        <Route
+          path="/reportes"
+          element={(
+            <ProtectedRoute adminOnly>
+              <Reportes />
+            </ProtectedRoute>
+          )}
+        />
         
         {/* Si escriben cualquier locura, mandar al Login */}
         <Route path="*" element={<Navigate to="/" />} />

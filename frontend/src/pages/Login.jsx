@@ -18,7 +18,12 @@ function Login() {
 
   useEffect(() => {
     toast.dismiss();
-  }, []);
+    const token = localStorage.getItem('token');
+    const usuarioGuardado = localStorage.getItem('usuario');
+    if (token && usuarioGuardado) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!pedirPass) setShowPassword(false);
@@ -58,7 +63,7 @@ function Login() {
           setAuthToken(response.data.token);
         }
         toast.success('¡Ingreso exitoso!');
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       } else if (response.data?.requires_password || response.data?.message === 'REQUIRES_PASSWORD') {
         setPedirPass(true);
         toast('Usuario administrador: ingresa tu clave');
