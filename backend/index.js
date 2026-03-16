@@ -580,6 +580,11 @@ const initSchema = async () => {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
   }
   try {
+    await db.query("ALTER TABLE registro_lecturas MODIFY COLUMN tipo_confirmacion ENUM('confirmacion','reconfirmacion') NOT NULL DEFAULT 'confirmacion'");
+  } catch (error) {
+    if (error.code !== 'ER_BAD_FIELD_ERROR') throw error;
+  }
+  try {
     await db.query('ALTER TABLE registro_lecturas ADD COLUMN oculto_reporte TINYINT(1) NOT NULL DEFAULT 0');
   } catch (error) {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
@@ -750,8 +755,9 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
     if (user.rol === 'admin') {
       if (!password) {
-        return res.status(401).json({
+        return res.json({
           success: false,
+          requires_password: true,
           message: 'REQUIRES_PASSWORD'
         });
       }
@@ -1166,6 +1172,9 @@ app.delete('/api/publicaciones/:id', requireAuth, requireAdmin, async (req, res)
 
 app.post('/api/registrar-vista', requireAuth, async (req, res) => {
   const { publicacion_id } = req.body;
+  if (!publicacion_id) {
+    return res.status(400).json({ success: false, message: 'publicacion_id es obligatorio' });
+  }
   try {
     const [pubRows] = await db.query(
       'SELECT id, fecha_publicacion, fecha_actualizacion_lectura FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
@@ -1207,11 +1216,22 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
     );
     const tipoConfirmacion = esReconfirmacion ? 'reconfirmacion' : 'confirmacion';
 
-    await db.query(
-      `INSERT INTO registro_lecturas (usuario_id, publicacion_id, tipo_confirmacion, oculto_reporte, oculto_reporte_at)
-       VALUES (?, ?, ?, 0, NULL)`,
-      [req.user.id, publicacion_id, tipoConfirmacion]
-    );
+    try {
+      await db.query(
+        `INSERT INTO registro_lecturas (usuario_id, publicacion_id, tipo_confirmacion, oculto_reporte, oculto_reporte_at)
+         VALUES (?, ?, ?, 0, NULL)`,
+        [req.user.id, publicacion_id, tipoConfirmacion]
+      );
+    } catch (insertError) {
+      if (['ER_BAD_FIELD_ERROR', 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD', 'ER_TRUNCATED_WRONG_VALUE'].includes(insertError.code)) {
+        await db.query(
+          'INSERT INTO registro_lecturas (usuario_id, publicacion_id) VALUES (?, ?)',
+          [req.user.id, publicacion_id]
+        );
+      } else {
+        throw insertError;
+      }
+    }
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -23,12 +23,12 @@ export const assetUrl = (path = '') => {
   return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 };
 
-export { API_BASE_URL };
-
 export const setAuthToken = (token) => {
   if (token) {
     axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-  } else {
-    delete axios.defaults.headers.common.Authorization;
+    return;
   }
+  delete axios.defaults.headers.common.Authorization;
 };
+
+export { API_BASE_URL };

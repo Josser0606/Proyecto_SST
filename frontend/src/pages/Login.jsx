@@ -59,6 +59,9 @@ function Login() {
         }
         toast.success('¡Ingreso exitoso!');
         navigate('/dashboard');
+      } else if (response.data?.requires_password || response.data?.message === 'REQUIRES_PASSWORD') {
+        setPedirPass(true);
+        toast('Usuario administrador: ingresa tu clave');
       }
     } catch (error) {
       if (error.response && error.response.status === 401) {
@@ -84,7 +87,6 @@ function Login() {
       } else {
         toast.error('Error de conexion con el servidor');
       }
-      console.error(error);
     } finally {
       setLoading(false);
     }
