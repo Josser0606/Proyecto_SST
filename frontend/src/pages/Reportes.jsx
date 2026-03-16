@@ -390,6 +390,21 @@ function Reportes() {
             <div className="min-h-0 flex-1 flex flex-col">
               <div className="space-y-2">
                 <button
+                  onClick={() => navigate('/dashboard')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white'
+                      : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                  }`}
+                >
+                  <span className={`w-5 h-5 rounded-md flex items-center justify-center ${darkMode ? 'bg-slate-700/80' : 'bg-slate-100'}`}>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path>
+                    </svg>
+                  </span>
+                  Inicio
+                </button>
+                <button
                   onClick={() => navigate('/admin')}
                   className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
                     darkMode
@@ -434,6 +449,13 @@ function Reportes() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-2">
+              <button onClick={() => navigate('/dashboard')} className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
+                darkMode ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+              }`} title="Inicio">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path>
+                </svg>
+              </button>
               <button onClick={() => navigate('/admin')} className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
                 darkMode ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
               }`} title="Crear nuevo">
@@ -459,7 +481,10 @@ function Reportes() {
 
       <main className={`flex-1 p-4 sm:p-6 lg:p-12 w-full ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
         <div className="max-w-7xl mx-auto">
-          <div className="lg:hidden grid grid-cols-3 gap-2 mb-4">
+        <div className="lg:hidden grid grid-cols-4 gap-2 mb-4">
+          <button onClick={() => navigate('/dashboard')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+            Inicio
+          </button>
           <button onClick={() => navigate('/admin')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
             Crear
           </button>

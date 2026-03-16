@@ -293,6 +293,17 @@ function Dashboard() {
                 <div className="pt-4 mt-4 border-t border-slate-800/10 space-y-2">
                   <p className="px-1 text-[10px] uppercase tracking-[0.18em] text-slate-400 font-black">Acciones rapidas</p>
                   <button
+                    onClick={() => navigate('/dashboard')}
+                    className="w-full text-left px-3 py-2.5 rounded-xl border border-green-500 bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all flex items-center gap-2 shadow-sm"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-white/25 flex items-center justify-center">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path>
+                      </svg>
+                    </span>
+                    Inicio
+                  </button>
+                  <button
                     onClick={() => navigate('/admin')}
                     className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
                       darkMode
@@ -349,6 +360,15 @@ function Dashboard() {
               </button>
               {usuario?.rol === 'admin' && (
                 <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="w-10 h-10 rounded-xl border border-green-500 bg-green-600 text-white hover:bg-green-700 transition shadow-sm flex items-center justify-center"
+                    title="Inicio"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path>
+                    </svg>
+                  </button>
                   <button
                     onClick={() => navigate('/admin')}
                     className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
@@ -443,8 +463,11 @@ function Dashboard() {
               )}
             </div>
             {usuario?.rol === 'admin' && (
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => navigate('/admin')} className="px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-black">
+              <div className="grid grid-cols-4 gap-2">
+                <button onClick={() => navigate('/dashboard')} className="px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-black">
+                  Inicio
+                </button>
+                <button onClick={() => navigate('/admin')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
                   Crear
                 </button>
                 <button onClick={() => navigate('/registro-personal')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
