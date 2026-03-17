@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMonitor, FiPaperclip, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
+import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMapPin, FiMonitor, FiPaperclip, FiRefreshCw, FiType, FiUpload, FiX } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
@@ -123,6 +123,7 @@ function AdminPanel() {
   const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
   const archivosSeleccionados = archivosInputs.filter(Boolean).length;
   const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
+  const caracteresContenido = contenido.trim().length;
   const tituloSugerencias = useMemo(() => {
     const value = titulo.trim();
     const normalized = normalizeText(value);
@@ -365,7 +366,7 @@ function AdminPanel() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path>
                 </svg>
               </button>
-              <button onClick={() => navigate('/admin')} className="w-10 h-10 rounded-xl border border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white hover:brightness-105 transition shadow-sm flex items-center justify-center" title="Crear nuevo">
+              <button onClick={() => navigate('/admin')} className="w-10 h-10 rounded-xl border border-green-500 bg-green-600 text-white hover:bg-green-700 transition shadow-sm flex items-center justify-center" title="Crear nuevo">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 5v14m-7-7h14"></path>
                 </svg>
@@ -426,7 +427,7 @@ function AdminPanel() {
             <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Diligencia titulo, area, recursos y contenido antes de publicar.</p>
           </div>
 
-          <div className="p-4 sm:p-8 space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6">
+          <div className="p-4 sm:p-8 space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6 lg:auto-rows-auto">
             <div className={`rounded-2xl border p-4 lg:col-span-12 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-slate-50/70'}`}>
               <div className="grid grid-cols-3 gap-3">
                 <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
@@ -453,11 +454,16 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:col-span-7">
-              <div className="md:col-span-3 space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Titulo del comunicado</label>
-                <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-4 lg:col-span-7 lg:row-start-2 lg:self-start">
+              <div className="md:col-span-3 lg:col-span-8 space-y-2">
+                <div className="px-1">
+                  <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiType className="text-green-600" />Titulo del comunicado</p>
+                  <p className="text-xs text-slate-500">Usa un titulo claro para identificar rapidamente el comunicado.</p>
+                </div>
+                <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`rounded-2xl border p-3 space-y-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+                  <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+                  <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <p className={`text-[10px] uppercase font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sugerencias de titulo</p>
                     <button
@@ -492,20 +498,27 @@ function AdminPanel() {
                     ))}
                   </div>
                 </div>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Area responsable</label>
-                <select className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                  {CATEGORIAS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+              <div className="space-y-2 lg:col-span-4">
+                <div className="px-1">
+                  <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiMapPin className="text-green-600" />Area responsable</p>
+                  <p className="text-xs text-slate-500">Selecciona el area a la que pertenece este contenido.</p>
+                </div>
+                <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+                <div className={`rounded-2xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+                  <select className={`w-full min-h-[58px] px-4 py-3 rounded-xl border text-base ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200'}`} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                    {CATEGORIAS.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="lg:col-span-5 lg:row-start-2 lg:self-start space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
                 <div>
-                <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiImage className="text-green-600" />Imagenes del comunicado</p>
-                <p className="text-xs text-slate-500">Puedes seleccionar una o varias imagenes. La primera sera la portada.</p>
+                  <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiImage className="text-green-600" />Imagenes del comunicado</p>
+                  <p className="text-xs text-slate-500">Puedes seleccionar una o varias imagenes. La primera sera la portada.</p>
                 </div>
                 <button
                   type="button"
@@ -520,6 +533,8 @@ function AdminPanel() {
                   Agregar imagen
                 </button>
               </div>
+              <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               {portadaPreviewUrl && (
                 <div className={`rounded-xl border p-2 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-white'}`}>
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Vista previa portada</p>
@@ -611,13 +626,14 @@ function AdminPanel() {
                   ))}
                 </div>
               )}
+              </div>
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="lg:col-span-5 lg:row-start-3 lg:self-start space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
                 <div>
-                <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiPaperclip className="text-green-600" />Archivos adjuntos</p>
-                <p className="text-xs text-slate-500">Adjunta documentos de apoyo (PDF, Word, Excel).</p>
+                  <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiPaperclip className="text-green-600" />Archivos adjuntos</p>
+                  <p className="text-xs text-slate-500">Adjunta documentos de apoyo (PDF, Word, Excel).</p>
                 </div>
                 <button
                   type="button"
@@ -632,6 +648,8 @@ function AdminPanel() {
                   Agregar archivo
                 </button>
               </div>
+              <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div
                 onDragOver={(e) => {
                   handleDragOver(e);
@@ -709,10 +727,11 @@ function AdminPanel() {
                   })}
                 </div>
               )}
+              </div>
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-2 lg:col-span-7 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="lg:col-span-7 lg:row-start-3 lg:self-start space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-1">
                 <div>
                   <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiLink2 className="text-green-600" />Links externos</p>
                   <p className="text-xs text-slate-500">Agrega enlaces para ampliar informacion.</p>
@@ -730,6 +749,8 @@ function AdminPanel() {
                   Agregar link
                 </button>
               </div>
+              <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`rounded-2xl border p-4 space-y-2 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               {links.map((link, idx) => (
                 <div key={idx} className={`field-row-animate flex flex-col sm:flex-row gap-2 rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-sm ${link?.trim() ? (darkMode ? 'border-emerald-700 bg-emerald-900/15' : 'border-emerald-200 bg-emerald-50/50') : (darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white')}`}>
                   <div className={`w-9 h-9 rounded-lg border shrink-0 flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
@@ -743,11 +764,30 @@ function AdminPanel() {
                   )}
                 </div>
               ))}
+              </div>
             </div>
 
-            <div className="space-y-1.5 lg:col-span-7">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><FiFileText className="text-green-600" />Cuerpo del mensaje</label>
-              <textarea placeholder="Información sobre evento..." required rows="6" className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={contenido} onChange={(e) => setContenido(e.target.value)}></textarea>
+            <div className="space-y-2 lg:col-span-12 lg:row-start-4 lg:self-start">
+              <div className="px-1">
+                <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiFileText className="text-green-600" />Cuerpo del mensaje</p>
+                <p className="text-xs text-slate-500">Redacta el contenido principal del comunicado con claridad.</p>
+              </div>
+              <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+              <div className={`rounded-2xl border p-4 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+                <textarea
+                  placeholder="Informacion sobre evento..."
+                  required
+                  rows="8"
+                  className={`w-full px-4 py-3 rounded-xl border resize-y ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200'}`}
+                  value={contenido}
+                  onChange={(e) => setContenido(e.target.value)}
+                ></textarea>
+                <div className="mt-2 flex items-center justify-end">
+                  <span className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {caracteresContenido} caracter(es)
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t lg:col-span-12 ${darkMode ? 'border-slate-800' : 'border-gray-50'}`}>

@@ -537,7 +537,7 @@ function Reportes() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                 </svg>
               </button>
-              <button onClick={() => navigate('/reportes')} className="w-10 h-10 rounded-xl border border-green-300 bg-gradient-to-r from-green-600 to-green-700 text-white hover:brightness-105 transition shadow-sm flex items-center justify-center" title="Auditoria">
+              <button onClick={() => navigate('/reportes')} className="w-10 h-10 rounded-xl border border-green-500 bg-green-600 text-white hover:bg-green-700 transition shadow-sm flex items-center justify-center" title="Auditoria">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 3v18h18M7 14l3-3 3 2 4-5"></path>
                 </svg>

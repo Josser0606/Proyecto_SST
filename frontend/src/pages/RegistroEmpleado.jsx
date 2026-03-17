@@ -405,9 +405,9 @@ function RegistroEmpleado() {
             className="fixed inset-0 z-[80] bg-slate-900/50 backdrop-blur-[1px]"
             onClick={cerrarFormulario}
           ></div>
-          <form ref={formRef} onSubmit={handleSubmit} className={`fixed left-1/2 top-1/2 z-[90] w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-[1.5rem] sm:rounded-[2rem] border shadow-2xl p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto ${
+          <form ref={formRef} onSubmit={handleSubmit} className={`modal-scroll fixed left-1/2 top-1/2 z-[90] w-[92vw] max-w-xl -translate-x-1/2 -translate-y-1/2 rounded-[1.1rem] sm:rounded-[1.4rem] border shadow-2xl p-4 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto overflow-x-hidden pr-3 sm:pr-4 ${
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
-          }`}>
+          } ${darkMode ? 'modal-scroll-dark' : ''}`}>
             <div className={`pb-4 border-b ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
               <div className="flex items-center justify-between gap-3">
                 <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{editandoId ? 'Editar empleado' : 'Nuevo empleado'}</h2>
@@ -543,7 +543,7 @@ function RegistroEmpleado() {
                     darkMode ? 'border-slate-700 text-slate-300 hover:text-white hover:border-slate-500' : 'border-gray-200 text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   }`}
                 >
-                  Cerrar
+                  Cancelar
                 </button>
               )}
             </div>
