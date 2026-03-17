@@ -619,7 +619,6 @@ function RegistroEmpleado() {
                       </div>
                       <div className="min-w-0">
                         <p className={`font-semibold leading-tight break-words ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{u.nombre_completo}</p>
-                        <p className={`text-[10px] uppercase tracking-wide ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>ID: EMP-{u.id}</p>
                       </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -698,7 +697,6 @@ function RegistroEmpleado() {
                         </div>
                         <div className="min-w-0">
                           <p className={`font-semibold leading-tight truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{u.nombre_completo}</p>
-                          <p className={`text-[10px] uppercase tracking-wide ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>ID: EMP-{u.id}</p>
                           <p className={`text-[11px] truncate ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{u.email || 'Sin correo'}</p>
                         </div>
                       </div>
