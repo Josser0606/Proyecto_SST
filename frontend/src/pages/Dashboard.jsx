@@ -452,8 +452,8 @@ function Dashboard() {
           )}
         </aside>
 
-        <main className={`flex-1 p-4 sm:p-6 lg:p-10 w-full ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
-          <div className="max-w-5xl mx-auto">
+        <main className={`flex-1 p-4 sm:p-6 md:p-10 w-full ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
+          <div className="max-w-6xl mx-auto">
           <div className="lg:hidden mb-4 space-y-3">
             <div className="relative">
               <button
