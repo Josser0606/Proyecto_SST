@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiFileText, FiImage, FiLink2, FiPaperclip } from 'react-icons/fi';
+import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMonitor, FiPaperclip, FiUpload, FiX } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
@@ -27,6 +27,8 @@ function AdminPanel() {
   const [loading, setLoading] = useState(false);
   const [portadaPreviewUrl, setPortadaPreviewUrl] = useState('');
   const [imagenesPreviewUrls, setImagenesPreviewUrls] = useState([]);
+  const [draggingImagenes, setDraggingImagenes] = useState(false);
+  const [draggingArchivos, setDraggingArchivos] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const navigate = useNavigate();
@@ -75,6 +77,65 @@ function AdminPanel() {
   const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
   const archivosSeleccionados = archivosInputs.filter(Boolean).length;
   const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
+  const getDisplayName = (fileName) => {
+    if (!fileName) return 'Ningun archivo seleccionado';
+    return fileName.length > 42 ? `${fileName.slice(0, 39)}...` : fileName;
+  };
+  const getFileExtension = (fileName = '') => fileName.split('.').pop()?.toUpperCase() || '';
+  const formatFileSize = (bytes = 0) => {
+    if (!bytes) return '0 KB';
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${Math.max(1, Math.round(kb))} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
+  };
+  const getDocTypeMeta = (fileName = '') => {
+    const ext = getFileExtension(fileName);
+    if (ext === 'PDF') return { label: 'PDF', className: 'bg-red-50 text-red-700 border-red-200', Icon: FiFileText };
+    if (ext === 'DOC' || ext === 'DOCX') return { label: 'WORD', className: 'bg-blue-50 text-blue-700 border-blue-200', Icon: FiFileText };
+    if (ext === 'XLS' || ext === 'XLSX') return { label: 'EXCEL', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: FiBarChart2 };
+    if (ext === 'PPT' || ext === 'PPTX') return { label: 'PPT', className: 'bg-orange-50 text-orange-700 border-orange-200', Icon: FiMonitor };
+    return { label: ext || 'FILE', className: 'bg-slate-50 text-slate-700 border-slate-200', Icon: FiFile };
+  };
+  const handleDragOver = (e) => {
+    e.preventDefault();
+  };
+  const mergeDroppedFilesInInputs = (prev, files) => {
+    const next = [...prev];
+    files.forEach((file) => {
+      const emptyIdx = next.findIndex((f) => !f);
+      if (emptyIdx >= 0) next[emptyIdx] = file;
+      else next.push(file);
+    });
+    return next.length > 0 ? next : [null];
+  };
+  const handleDropImagenes = (e) => {
+    e.preventDefault();
+    setDraggingImagenes(false);
+    const dropped = Array.from(e.dataTransfer?.files || []);
+    const valid = dropped.filter((f) => f.type.startsWith('image/'));
+    if (valid.length === 0) {
+      toast.error('Solo se permiten imagenes en este bloque');
+      return;
+    }
+    setImagenesInputs((prev) => mergeDroppedFilesInInputs(prev, valid));
+    toast.success(`${valid.length} imagen(es) agregada(s)`);
+  };
+  const handleDropArchivos = (e) => {
+    e.preventDefault();
+    setDraggingArchivos(false);
+    const dropped = Array.from(e.dataTransfer?.files || []);
+    const validExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+    const valid = dropped.filter((f) => {
+      const ext = f.name.split('.').pop()?.toLowerCase() || '';
+      return validExtensions.includes(ext);
+    });
+    if (valid.length === 0) {
+      toast.error('Solo PDF, Word, Excel o PowerPoint en este bloque');
+      return;
+    }
+    setArchivosInputs((prev) => mergeDroppedFilesInInputs(prev, valid));
+    toast.success(`${valid.length} archivo(s) agregado(s)`);
+  };
 
   useEffect(() => {
     const portada = imagenesInputs.find(Boolean);
@@ -337,7 +398,18 @@ function AdminPanel() {
                 <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiImage className="text-green-600" />Imagenes del comunicado</p>
                 <p className="text-xs text-slate-500">Puedes seleccionar una o varias imagenes. La primera sera la portada.</p>
                 </div>
-                <button type="button" onClick={addImagenInput} className="text-xs font-bold text-green-700">+ Agregar imagen</button>
+                <button
+                  type="button"
+                  onClick={addImagenInput}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black border transition ${
+                    darkMode
+                      ? 'border-green-800 bg-green-900/40 text-green-200 hover:bg-green-900/60'
+                      : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                  }`}
+                >
+                  <span className="text-sm leading-none">+</span>
+                  Agregar imagen
+                </button>
               </div>
               {portadaPreviewUrl && (
                 <div className={`rounded-xl border p-2 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-white'}`}>
@@ -345,16 +417,55 @@ function AdminPanel() {
                   <img src={portadaPreviewUrl} alt="Portada" className="w-full h-40 object-cover rounded-lg" />
                 </div>
               )}
+              <div
+                onDragOver={(e) => {
+                  handleDragOver(e);
+                  if (!draggingImagenes) setDraggingImagenes(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) setDraggingImagenes(false);
+                }}
+                onDrop={handleDropImagenes}
+                className={`rounded-xl border border-dashed p-3 text-xs font-semibold transition-all ${
+                  draggingImagenes
+                    ? darkMode
+                      ? 'border-green-500 bg-green-900/20 text-green-200'
+                      : 'border-green-500 bg-green-50 text-green-700'
+                    : darkMode
+                      ? 'border-slate-700 bg-slate-900/40 text-slate-400'
+                      : 'border-slate-300 bg-white text-slate-500'
+                }`}
+              >
+                Arrastra imagenes aqui para agregarlas mas rapido
+              </div>
               {imagenesInputs.map((img, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setImagenAt(idx, e.target.files?.[0])}
-                    className={`flex-1 px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200'}`}
-                  />
+                <div key={idx} className={`field-row-animate flex flex-col gap-2 rounded-xl border p-3 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-sm ${img ? (darkMode ? 'border-emerald-700 bg-emerald-900/20' : 'border-emerald-200 bg-emerald-50/60') : (darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white')}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Imagen {idx + 1} {idx === 0 ? '(Portada)' : ''}
+                    </p>
+                    {img && <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}><FiCheckCircle /> Agregada</span>}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <label htmlFor={`imagen-input-${idx}`} className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-black border cursor-pointer transition whitespace-nowrap ${darkMode ? 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                      <FiUpload />
+                      {img ? 'Cambiar imagen' : 'Seleccionar imagen'}
+                    </label>
+                    <input
+                      id={`imagen-input-${idx}`}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setImagenAt(idx, e.target.files?.[0])}
+                      className="hidden"
+                    />
+                    <div className={`flex-1 px-3 py-2.5 rounded-lg border text-xs font-semibold truncate ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
+                      {getDisplayName(img?.name)}
+                    </div>
+                  </div>
                   {imagenesInputs.length > 1 && (
-                    <button type="button" onClick={() => removeImagenInput(idx)} className="px-3 rounded-xl border border-red-200 text-red-600">X</button>
+                    <button type="button" onClick={() => removeImagenInput(idx)} className={`self-end inline-flex items-center justify-center w-8 h-8 rounded-lg border transition ${darkMode ? 'border-red-700/70 text-red-300 hover:bg-red-900/30' : 'border-red-200 text-red-600 hover:bg-red-50'}`} title="Eliminar campo de imagen">
+                      <FiX />
+                    </button>
                   )}
                 </div>
               ))}
@@ -379,9 +490,17 @@ function AdminPanel() {
                 </div>
               )}
               {imagenesInputs.filter(Boolean).length > 0 && (
-                <ul className={`text-xs rounded-lg p-3 space-y-1 border max-h-28 overflow-auto ${darkMode ? 'text-slate-300 bg-slate-900 border-slate-700' : 'text-slate-600 bg-white border-gray-200'}`}>
-                  {imagenesInputs.filter(Boolean).map((f, i) => <li key={`${f.name}-${i}`}>{i === 0 ? `Portada: ${f.name}` : f.name}</li>)}
-                </ul>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {imagenesInputs.filter(Boolean).map((f, i) => (
+                    <div key={`${f.name}-${i}`} className={`rounded-lg border px-2.5 py-2 text-xs ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-700'}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold truncate">{getDisplayName(f.name)}</span>
+                        {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white font-black">PORTADA</span>}
+                      </div>
+                      <div className={`mt-1 text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{formatFileSize(f.size)}</div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -391,18 +510,68 @@ function AdminPanel() {
                 <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiPaperclip className="text-green-600" />Archivos adjuntos</p>
                 <p className="text-xs text-slate-500">Adjunta documentos de apoyo (PDF, Word, Excel).</p>
                 </div>
-                <button type="button" onClick={addArchivoInput} className="text-xs font-bold text-green-700">+ Agregar archivo</button>
+                <button
+                  type="button"
+                  onClick={addArchivoInput}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black border transition ${
+                    darkMode
+                      ? 'border-green-800 bg-green-900/40 text-green-200 hover:bg-green-900/60'
+                      : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                  }`}
+                >
+                  <span className="text-sm leading-none">+</span>
+                  Agregar archivo
+                </button>
+              </div>
+              <div
+                onDragOver={(e) => {
+                  handleDragOver(e);
+                  if (!draggingArchivos) setDraggingArchivos(true);
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) setDraggingArchivos(false);
+                }}
+                onDrop={handleDropArchivos}
+                className={`rounded-xl border border-dashed p-3 text-xs font-semibold transition-all ${
+                  draggingArchivos
+                    ? darkMode
+                      ? 'border-green-500 bg-green-900/20 text-green-200'
+                      : 'border-green-500 bg-green-50 text-green-700'
+                    : darkMode
+                      ? 'border-slate-700 bg-slate-900/40 text-slate-400'
+                      : 'border-slate-300 bg-white text-slate-500'
+                }`}
+              >
+                Arrastra archivos aqui (PDF, Word, Excel, PowerPoint)
               </div>
               {archivosInputs.map((file, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx"
-                    onChange={(e) => setArchivoAt(idx, e.target.files?.[0])}
-                    className={`flex-1 px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200'}`}
-                  />
+                <div key={idx} className={`field-row-animate flex flex-col gap-2 rounded-xl border p-3 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-sm ${file ? (darkMode ? 'border-emerald-700 bg-emerald-900/20' : 'border-emerald-200 bg-emerald-50/60') : (darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white')}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
+                      Archivo {idx + 1}
+                    </p>
+                    {file && <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}><FiCheckCircle /> Agregado</span>}
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <label htmlFor={`archivo-input-${idx}`} className={`inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-black border cursor-pointer transition whitespace-nowrap ${darkMode ? 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700' : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+                      <FiUpload />
+                      {file ? 'Cambiar archivo' : 'Seleccionar archivo'}
+                    </label>
+                    <input
+                      id={`archivo-input-${idx}`}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                      onChange={(e) => setArchivoAt(idx, e.target.files?.[0])}
+                      className="hidden"
+                    />
+                    <div className={`flex-1 px-3 py-2.5 rounded-lg border text-xs font-semibold truncate ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
+                      {getDisplayName(file?.name)}
+                    </div>
+                  </div>
                   {archivosInputs.length > 1 && (
-                    <button type="button" onClick={() => removeArchivoInput(idx)} className="px-3 rounded-xl border border-red-200 text-red-600">X</button>
+                    <button type="button" onClick={() => removeArchivoInput(idx)} className={`self-end inline-flex items-center justify-center w-8 h-8 rounded-lg border transition ${darkMode ? 'border-red-700/70 text-red-300 hover:bg-red-900/30' : 'border-red-200 text-red-600 hover:bg-red-50'}`} title="Eliminar campo de archivo">
+                      <FiX />
+                    </button>
                   )}
                 </div>
               ))}
@@ -410,9 +579,26 @@ function AdminPanel() {
                 {archivosInputs.filter(Boolean).length > 0 ? `${archivosInputs.filter(Boolean).length} archivo(s) agregado(s)` : 'No hay archivos agregados'}
               </p>
               {archivosInputs.filter(Boolean).length > 0 && (
-                <ul className={`text-xs rounded-lg p-3 space-y-1 border max-h-28 overflow-auto ${darkMode ? 'text-slate-300 bg-slate-900 border-slate-700' : 'text-slate-600 bg-white border-gray-200'}`}>
-                  {archivosInputs.filter(Boolean).map((f, i) => <li key={`${f.name}-${i}`}>{f.name}</li>)}
-                </ul>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {archivosInputs.filter(Boolean).map((f, i) => {
+                    const typeMeta = getDocTypeMeta(f.name);
+                    const TypeIcon = typeMeta.Icon;
+                    return (
+                      <div key={`${f.name}-${i}`} className={`rounded-lg border px-2.5 py-2 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className={`text-xs font-bold truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{getDisplayName(f.name)}</p>
+                            <p className={`text-[10px] mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{formatFileSize(f.size)}</p>
+                          </div>
+                          <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-black uppercase border rounded px-1.5 py-0.5 ${typeMeta.className}`}>
+                            <TypeIcon className="w-3 h-3" />
+                            {typeMeta.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -422,12 +608,30 @@ function AdminPanel() {
                   <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiLink2 className="text-green-600" />Links externos</p>
                   <p className="text-xs text-slate-500">Agrega enlaces para ampliar informacion.</p>
                 </div>
-                <button type="button" onClick={addLink} className="text-xs font-bold text-green-700">+ Agregar link</button>
+                <button
+                  type="button"
+                  onClick={addLink}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black border transition ${
+                    darkMode
+                      ? 'border-green-800 bg-green-900/40 text-green-200 hover:bg-green-900/60'
+                      : 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100'
+                  }`}
+                >
+                  <span className="text-sm leading-none">+</span>
+                  Agregar link
+                </button>
               </div>
               {links.map((link, idx) => (
-                <div key={idx} className="flex flex-col sm:flex-row gap-2">
-                  <input type="url" placeholder="https://..." value={link} onChange={(e) => setLinkAt(idx, e.target.value)} className={`flex-1 px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200'}`} />
-                  {links.length > 1 && <button type="button" onClick={() => removeLink(idx)} className="px-3 rounded-xl border border-red-200 text-red-600">X</button>}
+                <div key={idx} className={`field-row-animate flex flex-col sm:flex-row gap-2 rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-sm ${link?.trim() ? (darkMode ? 'border-emerald-700 bg-emerald-900/15' : 'border-emerald-200 bg-emerald-50/50') : (darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white')}`}>
+                  <div className={`w-9 h-9 rounded-lg border shrink-0 flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    <FiLink2 />
+                  </div>
+                  <input type="url" placeholder="https://..." value={link} onChange={(e) => setLinkAt(idx, e.target.value)} className={`flex-1 px-4 py-2.5 rounded-lg border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200'}`} />
+                  {links.length > 1 && (
+                    <button type="button" onClick={() => removeLink(idx)} className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border transition ${darkMode ? 'border-red-700/70 text-red-300 hover:bg-red-900/30' : 'border-red-200 text-red-600 hover:bg-red-50'}`} title="Eliminar campo de link">
+                      <FiX />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

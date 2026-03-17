@@ -67,3 +67,18 @@ textarea:disabled {
     height: 0;
   }
 }
+
+@keyframes field-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.field-row-animate {
+  animation: field-row-enter 0.24s ease;
+}
