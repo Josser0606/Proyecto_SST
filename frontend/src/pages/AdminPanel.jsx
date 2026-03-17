@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FiFileText, FiImage, FiLink2, FiPaperclip } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
@@ -24,6 +25,7 @@ function AdminPanel() {
   const [archivosInputs, setArchivosInputs] = useState([null]);
   const [links, setLinks] = useState(['']);
   const [loading, setLoading] = useState(false);
+  const [portadaPreviewUrl, setPortadaPreviewUrl] = useState('');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const navigate = useNavigate();
@@ -72,6 +74,17 @@ function AdminPanel() {
   const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
   const archivosSeleccionados = archivosInputs.filter(Boolean).length;
   const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
+
+  useEffect(() => {
+    const portada = imagenesInputs.find(Boolean);
+    if (!portada) {
+      setPortadaPreviewUrl('');
+      return undefined;
+    }
+    const localUrl = URL.createObjectURL(portada);
+    setPortadaPreviewUrl(localUrl);
+    return () => URL.revokeObjectURL(localUrl);
+  }, [imagenesInputs]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -270,15 +283,24 @@ function AdminPanel() {
             <div className={`rounded-2xl border p-4 lg:col-span-12 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-slate-50/70'}`}>
               <div className="grid grid-cols-3 gap-3">
                 <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Imagenes</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Imagenes</p>
+                    <FiImage className={`${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  </div>
                   <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{imagenesSeleccionadas}</p>
                 </div>
                 <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Archivos</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Archivos</p>
+                    <FiPaperclip className={`${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  </div>
                   <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{archivosSeleccionados}</p>
                 </div>
                 <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Links</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Links</p>
+                    <FiLink2 className={`${darkMode ? 'text-slate-300' : 'text-slate-500'}`} />
+                  </div>
                   <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{linksActivos}</p>
                 </div>
               </div>
@@ -300,11 +322,17 @@ function AdminPanel() {
             <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Imagenes del comunicado</p>
+                <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiImage className="text-green-600" />Imagenes del comunicado</p>
                 <p className="text-xs text-slate-500">Puedes seleccionar una o varias imagenes. La primera sera la portada.</p>
                 </div>
                 <button type="button" onClick={addImagenInput} className="text-xs font-bold text-green-700">+ Agregar imagen</button>
               </div>
+              {portadaPreviewUrl && (
+                <div className={`rounded-xl border p-2 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Vista previa portada</p>
+                  <img src={portadaPreviewUrl} alt="Portada" className="w-full h-40 object-cover rounded-lg" />
+                </div>
+              )}
               {imagenesInputs.map((img, idx) => (
                 <div key={idx} className="flex flex-col sm:flex-row gap-2">
                   <input
@@ -331,7 +359,7 @@ function AdminPanel() {
             <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Archivos adjuntos</p>
+                <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiPaperclip className="text-green-600" />Archivos adjuntos</p>
                 <p className="text-xs text-slate-500">Adjunta documentos de apoyo (PDF, Word, Excel).</p>
                 </div>
                 <button type="button" onClick={addArchivoInput} className="text-xs font-bold text-green-700">+ Agregar archivo</button>
@@ -362,7 +390,7 @@ function AdminPanel() {
             <div className={`rounded-2xl border p-4 space-y-2 lg:col-span-7 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Links externos</p>
+                  <p className={`text-sm font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><FiLink2 className="text-green-600" />Links externos</p>
                   <p className="text-xs text-slate-500">Agrega enlaces para ampliar informacion.</p>
                 </div>
                 <button type="button" onClick={addLink} className="text-xs font-bold text-green-700">+ Agregar link</button>
@@ -376,7 +404,7 @@ function AdminPanel() {
             </div>
 
             <div className="space-y-1.5 lg:col-span-7">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cuerpo del mensaje</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2"><FiFileText className="text-green-600" />Cuerpo del mensaje</label>
               <textarea placeholder="Información sobre evento..." required rows="6" className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={contenido} onChange={(e) => setContenido(e.target.value)}></textarea>
             </div>
 
