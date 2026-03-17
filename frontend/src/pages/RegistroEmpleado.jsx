@@ -583,32 +583,28 @@ function RegistroEmpleado() {
               </div>
             </div>
 
-            <div className="mb-4">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                <p className={`text-xs tracking-normal leading-tight ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Listado general con busqueda por nombre, area, rol o correo.</p>
-
-                <div className="w-full lg:w-[360px]">
-                  <label className={`text-[10px] uppercase tracking-normal font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
-                  <div className="mt-1 flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={filtro}
-                      onChange={(e) => setFiltro(e.target.value)}
-                      placeholder="Nombre, area, rol o correo"
-                      className={`flex-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 text-sm ${
-                        darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white'
-                      }`}
-                    />
-                    {!!filtro && (
-                      <button
-                        type="button"
-                        onClick={() => setFiltro('')}
-                        className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-green-200 text-green-700 hover:bg-green-50"
-                      >
-                        Limpiar
-                      </button>
-                    )}
-                  </div>
+            <div className="mb-4 flex justify-end">
+              <div className="w-full lg:w-[360px]">
+                <label className={`text-[10px] uppercase tracking-normal font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
+                <div className="mt-1 flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                    placeholder="Nombre, area, rol o correo"
+                    className={`flex-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 text-sm ${
+                      darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white'
+                    }`}
+                  />
+                  {!!filtro && (
+                    <button
+                      type="button"
+                      onClick={() => setFiltro('')}
+                      className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-green-200 text-green-700 hover:bg-green-50"
+                    >
+                      Limpiar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
