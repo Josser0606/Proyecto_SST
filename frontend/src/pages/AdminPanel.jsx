@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMonitor, FiPaperclip, FiUpload, FiX } from 'react-icons/fi';
+import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMonitor, FiPaperclip, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
@@ -17,6 +17,50 @@ const CATEGORIAS = [
   'Direccion'
 ];
 
+const TITULOS_BASE = [
+  'Comunicado para todo el personal',
+  'Actualizacion de procesos internos',
+  'Novedades del area administrativa',
+  'Recordatorio de cumplimiento y seguridad',
+  'Informacion importante de la fundacion',
+  'Cronograma de actividades semanales',
+  'Lineamientos para la jornada de trabajo',
+  'Aviso general para colaboradores',
+  'Capacitacion y seguimiento operativo',
+  'Actualizacion de politicas internas'
+];
+
+const normalizeText = (value = '') =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+const toTitleCase = (value = '') =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+
+const hashSeed = (value = '') => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+};
+
+const pickStableRandom = (items, count, seedText) => {
+  const arr = [...items];
+  let seed = hashSeed(seedText || 'saciar');
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    seed = (seed * 9301 + 49297) % 233280;
+    const j = seed % (i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, count);
+};
+
 function AdminPanel() {
   const [titulo, setTitulo] = useState('');
   const [contenido, setContenido] = useState('');
@@ -29,6 +73,8 @@ function AdminPanel() {
   const [imagenesPreviewUrls, setImagenesPreviewUrls] = useState([]);
   const [draggingImagenes, setDraggingImagenes] = useState(false);
   const [draggingArchivos, setDraggingArchivos] = useState(false);
+  const [tituloSeed, setTituloSeed] = useState(0);
+  const [refreshingTitulos, setRefreshingTitulos] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const navigate = useNavigate();
@@ -77,6 +123,29 @@ function AdminPanel() {
   const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
   const archivosSeleccionados = archivosInputs.filter(Boolean).length;
   const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
+  const tituloSugerencias = useMemo(() => {
+    const value = titulo.trim();
+    const normalized = normalizeText(value);
+    const randomBase = pickStableRandom(TITULOS_BASE, 4, `${value}-${categoria}-${tituloSeed}`);
+
+    if (!value) return randomBase;
+
+    const parts = value.split(/\s+/).filter((w) => w.length >= 3);
+    const textMain = toTitleCase(value);
+    const keyword = toTitleCase(parts.slice(0, 4).join(' '));
+
+    const context = [
+      `${textMain} - ${categoria}`,
+      `Comunicado: ${textMain}`,
+      `Actualizacion: ${textMain}`,
+      `Lineamientos sobre ${keyword || textMain}`,
+      `Informacion importante: ${textMain}`
+    ];
+
+    const relatedBase = TITULOS_BASE.filter((item) => normalizeText(item).includes(normalized));
+    const mixed = [...context, ...relatedBase, ...randomBase];
+    return [...new Set(mixed)].filter(Boolean).slice(0, 6);
+  }, [titulo, categoria, tituloSeed]);
   const getDisplayName = (fileName) => {
     if (!fileName) return 'Ningun archivo seleccionado';
     return fileName.length > 42 ? `${fileName.slice(0, 39)}...` : fileName;
@@ -135,6 +204,11 @@ function AdminPanel() {
     }
     setArchivosInputs((prev) => mergeDroppedFilesInInputs(prev, valid));
     toast.success(`${valid.length} archivo(s) agregado(s)`);
+  };
+  const refreshTituloSuggestions = () => {
+    setRefreshingTitulos(true);
+    setTituloSeed((prev) => prev + 1);
+    setTimeout(() => setRefreshingTitulos(false), 380);
   };
 
   useEffect(() => {
@@ -383,6 +457,41 @@ function AdminPanel() {
               <div className="md:col-span-3 space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Titulo del comunicado</label>
                 <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+                <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className={`text-[10px] uppercase font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sugerencias de titulo</p>
+                    <button
+                      type="button"
+                      onClick={refreshTituloSuggestions}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-black transition ${
+                        darkMode
+                          ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-green-500 hover:text-green-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
+                      }`}
+                      title="Generar nuevas sugerencias"
+                    >
+                      <FiRefreshCw className={`w-3 h-3 ${refreshingTitulos ? 'animate-spin' : ''}`} />
+                      Nuevas
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {tituloSugerencias.map((sugerencia, idx) => (
+                      <button
+                        key={`${sugerencia}-${idx}`}
+                        type="button"
+                        onClick={() => setTitulo(sugerencia)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
+                          darkMode
+                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300'
+                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-green-300 hover:text-green-700'
+                        }`}
+                        title="Usar este titulo"
+                      >
+                        {sugerencia}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Area responsable</label>
