@@ -635,6 +635,25 @@ const initSchema = async () => {
     )
   `);
 
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS publicacion_reacciones (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      publicacion_id INT NOT NULL,
+      usuario_id INT NOT NULL,
+      reaccion ENUM('util','importante','me-gusta') NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_pub_reaccion_usuario (publicacion_id, usuario_id),
+      FOREIGN KEY (publicacion_id) REFERENCES publicaciones(id) ON DELETE CASCADE,
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )
+  `);
+  try {
+    await db.query("ALTER TABLE publicacion_reacciones MODIFY COLUMN reaccion ENUM('util','importante','me-gusta') NOT NULL");
+  } catch (error) {
+    if (error.code !== 'ER_BAD_FIELD_ERROR') throw error;
+  }
+
   try {
     await db.query('CREATE INDEX idx_audit_logs_user ON audit_logs(user_id, created_at)');
   } catch (error) {
@@ -649,6 +668,12 @@ const initSchema = async () => {
 
   try {
     await db.query('CREATE INDEX idx_email_queue_pub ON email_queue(publicacion_id)');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+
+  try {
+    await db.query('CREATE INDEX idx_pub_reacciones_pub_reaccion ON publicacion_reacciones(publicacion_id, reaccion)');
   } catch (error) {
     if (error.code !== 'ER_DUP_KEYNAME') throw error;
   }
@@ -727,16 +752,46 @@ const getPublicacionesWithRecursos = async (usuarioId) => {
      ORDER BY id ASC`,
     [ids]
   );
+  const [reaccionesRows] = await db.query(
+    `SELECT publicacion_id, reaccion, COUNT(*) AS total
+     FROM publicacion_reacciones
+     WHERE publicacion_id IN (?)
+     GROUP BY publicacion_id, reaccion`,
+    [ids]
+  );
+  const [reaccionUsuarioRows] = await db.query(
+    `SELECT publicacion_id, reaccion
+     FROM publicacion_reacciones
+     WHERE usuario_id = ? AND publicacion_id IN (?)`,
+    [usuarioId || 0, ids]
+  );
 
   const recursosMap = new Map();
   recursos.forEach((r) => {
     if (!recursosMap.has(r.publicacion_id)) recursosMap.set(r.publicacion_id, []);
     recursosMap.get(r.publicacion_id).push(r);
   });
+  const reaccionesMap = new Map();
+  reaccionesRows.forEach((r) => {
+    if (!reaccionesMap.has(r.publicacion_id)) {
+      reaccionesMap.set(r.publicacion_id, { util: 0, importante: 0, 'me-gusta': 0, total: 0 });
+    }
+    const bucket = reaccionesMap.get(r.publicacion_id);
+    const key = String(r.reaccion || '');
+    const value = Number(r.total || 0);
+    if (['util', 'importante', 'me-gusta'].includes(key)) bucket[key] = value;
+    bucket.total += value;
+  });
+  const reaccionUsuarioMap = new Map();
+  reaccionUsuarioRows.forEach((r) => {
+    reaccionUsuarioMap.set(r.publicacion_id, r.reaccion);
+  });
 
   return publicaciones.map((p) => ({
     ...p,
-    recursos: recursosMap.get(p.id) || []
+    recursos: recursosMap.get(p.id) || [],
+    reacciones: reaccionesMap.get(p.id) || { util: 0, importante: 0, 'me-gusta': 0, total: 0 },
+    reaccion_usuario: reaccionUsuarioMap.get(p.id) || null
   }));
 };
 
@@ -1009,6 +1064,72 @@ app.get('/api/publicaciones', requireAuth, async (req, res) => {
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/publicaciones/:id/reaccion', requireAuth, async (req, res) => {
+  const publicacionId = Number(req.params.id);
+  const usuarioId = Number(req.user?.id || 0);
+  const reaccion = req.body?.reaccion == null ? null : String(req.body.reaccion).trim();
+  const permitidas = ['util', 'importante', 'me-gusta'];
+
+  if (!publicacionId || !usuarioId) {
+    return res.status(400).json({ success: false, message: 'Datos invalidos para reaccionar' });
+  }
+  if (reaccion !== null && !permitidas.includes(reaccion)) {
+    return res.status(400).json({ success: false, message: 'Tipo de reaccion invalido' });
+  }
+
+  try {
+    const [pub] = await db.query(
+      'SELECT id FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+      [publicacionId]
+    );
+    if (pub.length === 0) {
+      return res.status(404).json({ success: false, message: 'Comunicado no encontrado' });
+    }
+
+    if (reaccion === null) {
+      await db.query(
+        'DELETE FROM publicacion_reacciones WHERE publicacion_id = ? AND usuario_id = ?',
+        [publicacionId, usuarioId]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO publicacion_reacciones (publicacion_id, usuario_id, reaccion)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE reaccion = VALUES(reaccion), updated_at = CURRENT_TIMESTAMP`,
+        [publicacionId, usuarioId, reaccion]
+      );
+    }
+
+    const [resumenRows] = await db.query(
+      `SELECT reaccion, COUNT(*) AS total
+       FROM publicacion_reacciones
+       WHERE publicacion_id = ?
+       GROUP BY reaccion`,
+      [publicacionId]
+    );
+    const [usuarioRow] = await db.query(
+      'SELECT reaccion FROM publicacion_reacciones WHERE publicacion_id = ? AND usuario_id = ? LIMIT 1',
+      [publicacionId, usuarioId]
+    );
+
+    const resumen = { util: 0, importante: 0, 'me-gusta': 0, total: 0 };
+    resumenRows.forEach((row) => {
+      const key = String(row.reaccion || '');
+      const total = Number(row.total || 0);
+      if (permitidas.includes(key)) resumen[key] = total;
+      resumen.total += total;
+    });
+
+    return res.json({
+      success: true,
+      reaccion_usuario: usuarioRow[0]?.reaccion || null,
+      reacciones: resumen
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FiEdit2, FiHeart, FiThumbsUp, FiTrash2, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 
@@ -46,6 +47,11 @@ function Dashboard() {
   }, []);
   const navigate = useNavigate();
   const cargandoPublicacionesRef = useRef(false);
+  const REACCIONES_DISPONIBLES = [
+    { key: 'util', label: 'Util', icon: FiThumbsUp },
+    { key: 'importante', label: 'Importante', icon: FiZap },
+    { key: 'me-gusta', label: 'Me gusta', icon: FiHeart }
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -206,6 +212,28 @@ function Dashboard() {
 
   const removeLinkNuevo = (idx) => {
     setFormEdit((prev) => ({ ...prev, linksNuevos: prev.linksNuevos.filter((_, i) => i !== idx) }));
+  };
+
+  const toggleReaccion = async (publicacionId, actual, reactionKey) => {
+    if (!usuario?.id) return;
+    const nextReaction = actual === reactionKey ? null : reactionKey;
+    try {
+      const { data } = await axios.post(apiUrl(`/api/publicaciones/${publicacionId}/reaccion`), {
+        reaccion: nextReaction
+      });
+      setPublicaciones((prev) => prev.map((p) => (
+        p.id === publicacionId
+          ? {
+            ...p,
+            reaccion_usuario: data?.reaccion_usuario ?? null,
+            reacciones: data?.reacciones || p.reacciones
+          }
+          : p
+      )));
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'No fue posible registrar reaccion';
+      toast.error(msg);
+    }
   };
 
   const guardarEdicion = async (id) => {
@@ -535,7 +563,7 @@ function Dashboard() {
                     ? 'Reconfirmar lectura'
                     : 'Confirmar lectura';
               return (
-              <article key={pub.id} className={`rounded-[2.5rem] overflow-hidden border transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
+              <article key={pub.id} className={`rounded-[2.2rem] overflow-hidden border transition-all duration-300 hover:-translate-y-[1px] ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
                 {pub.imagen_url && (
                   <div className={`w-full flex justify-center p-4 sm:p-8 border-b ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-gray-50'}`}>
                     <img src={assetUrl(pub.imagen_url)} alt="Comunicado" className="max-w-full h-auto max-h-[85vh] rounded-2xl shadow-2xl object-contain transition-transform duration-500 hover:scale-[1.01]" />
@@ -550,6 +578,18 @@ function Dashboard() {
 
                   {editandoId === pub.id ? (
                     <div className="space-y-4">
+                      <div className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${darkMode ? 'border-green-900 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                        <p className={`text-xs font-semibold ${darkMode ? 'text-green-200' : 'text-green-800'}`}>
+                          Editando este comunicado. Si deseas crear uno nuevo, abre el formulario principal.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => navigate('/admin')}
+                          className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-black border ${darkMode ? 'border-green-700 bg-slate-900 text-green-300' : 'border-green-300 bg-white text-green-700'}`}
+                        >
+                          Crear nuevo
+                        </button>
+                      </div>
                       <input className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : ''}`} value={formEdit.titulo} onChange={(e) => setFormEdit({ ...formEdit, titulo: e.target.value })} />
                       <select className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : ''}`} value={formEdit.categoria} onChange={(e) => setFormEdit({ ...formEdit, categoria: e.target.value })}>
                         {CATEGORIAS.filter((c) => c !== 'Todas').map((c) => <option key={c} value={c}>{c}</option>)}
@@ -631,6 +671,46 @@ function Dashboard() {
                           </div>
                         </div>
                       )}
+
+                      <div className={`mb-2 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Reacciones</p>
+                          <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tu opinion sobre el comunicado</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {REACCIONES_DISPONIBLES.map((item) => {
+                            const Icon = item.icon;
+                            const active = pub.reaccion_usuario === item.key;
+                            const count = Number(pub.reacciones?.[item.key] || 0);
+                            return (
+                              <button
+                                key={`${pub.id}-${item.key}`}
+                                type="button"
+                                onClick={() => toggleReaccion(pub.id, pub.reaccion_usuario, item.key)}
+                                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black border transition ${
+                                  active
+                                    ? 'bg-green-600 text-white border-green-600'
+                                    : darkMode
+                                      ? 'bg-slate-900 text-slate-300 border-slate-700 hover:border-green-500 hover:text-green-300'
+                                      : 'bg-white text-slate-700 border-slate-200 hover:border-green-300 hover:text-green-700'
+                                }`}
+                              >
+                                <Icon className="w-3.5 h-3.5" />
+                                {item.label}
+                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                                  active
+                                    ? 'bg-white/20 text-white'
+                                    : darkMode
+                                      ? 'bg-slate-800 text-slate-300'
+                                      : 'bg-slate-100 text-slate-600'
+                                }`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </>
                   )}
 
@@ -649,9 +729,29 @@ function Dashboard() {
                     </button>
 
                     {usuario?.rol === 'admin' && editandoId !== pub.id && (
-                      <div className="flex gap-2">
-                        <button onClick={() => activarEdicion(pub)} className="p-2 text-slate-400 hover:text-green-700">Editar</button>
-                        <button onClick={() => eliminarPub(pub.id)} className="p-2 text-slate-400 hover:text-red-500">Eliminar</button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => activarEdicion(pub)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-black transition ${
+                            darkMode
+                              ? 'border-slate-700 bg-slate-900 text-slate-200 hover:border-green-500 hover:text-green-300'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-green-300 hover:text-green-700'
+                          }`}
+                        >
+                          <FiEdit2 className="w-3.5 h-3.5" />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => eliminarPub(pub.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-black transition ${
+                            darkMode
+                              ? 'border-red-900 bg-slate-900 text-red-300 hover:bg-red-900/20'
+                              : 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
+                          }`}
+                        >
+                          <FiTrash2 className="w-3.5 h-3.5" />
+                          Eliminar
+                        </button>
                       </div>
                     )}
                   </div>
