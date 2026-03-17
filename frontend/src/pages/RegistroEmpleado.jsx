@@ -555,56 +555,55 @@ function RegistroEmpleado() {
             darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100'
           }`}>
             <div className={`pb-4 mb-5 border-b ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                 <div>
                   <h2 className={`text-lg font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>Empleados registrados</h2>
                   <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     Gestiona el personal y abre el formulario solo cuando lo necesites.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (formOpen && !editandoId) {
-                      cerrarFormulario();
-                      return;
-                    }
-                    limpiarFormulario();
-                    setFormOpen(true);
-                  }}
-                  className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
-                    formOpen && !editandoId
-                      ? (darkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                >
-                  {formOpen && !editandoId ? 'Ocultar formulario' : 'Crear empleado'}
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-4 flex justify-end">
-              <div className="w-full lg:w-[360px]">
-                <label className={`text-[10px] uppercase tracking-normal font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
-                <div className="mt-1 flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={filtro}
-                    onChange={(e) => setFiltro(e.target.value)}
-                    placeholder="Nombre, area, rol o correo"
-                    className={`flex-1 px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 text-sm ${
-                      darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white'
+                <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-2 sm:items-end">
+                  <div className="w-full sm:w-[320px]">
+                    <label className={`text-[10px] uppercase tracking-normal font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Busqueda</label>
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={filtro}
+                        onChange={(e) => setFiltro(e.target.value)}
+                        placeholder="Nombre, area, rol o correo"
+                        className={`w-full px-3 py-2.5 rounded-xl border focus:outline-none focus:ring-2 focus:ring-green-500/20 text-sm ${
+                          darkMode ? 'border-slate-700 bg-slate-800 text-slate-100' : 'border-gray-200 bg-gray-50 focus:bg-white'
+                        }`}
+                      />
+                      {!!filtro && (
+                        <button
+                          type="button"
+                          onClick={() => setFiltro('')}
+                          className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-green-200 text-green-700 hover:bg-green-50"
+                        >
+                          Limpiar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formOpen && !editandoId) {
+                        cerrarFormulario();
+                        return;
+                      }
+                      limpiarFormulario();
+                      setFormOpen(true);
+                    }}
+                    className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
+                      formOpen && !editandoId
+                        ? (darkMode ? 'bg-slate-700 text-slate-100 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
+                        : 'bg-green-600 text-white hover:bg-green-700'
                     }`}
-                  />
-                  {!!filtro && (
-                    <button
-                      type="button"
-                      onClick={() => setFiltro('')}
-                      className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-green-200 text-green-700 hover:bg-green-50"
-                    >
-                      Limpiar
-                    </button>
-                  )}
+                  >
+                    {formOpen && !editandoId ? 'Ocultar formulario' : 'Crear empleado'}
+                  </button>
                 </div>
               </div>
             </div>
