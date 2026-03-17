@@ -69,6 +69,9 @@ function AdminPanel() {
   };
   const setImagenAt = (idx, file) => setImagenesInputs((prev) => prev.map((f, i) => (i === idx ? (file || null) : f)));
   const setArchivoAt = (idx, file) => setArchivosInputs((prev) => prev.map((f, i) => (i === idx ? (file || null) : f)));
+  const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
+  const archivosSeleccionados = archivosInputs.filter(Boolean).length;
+  const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -263,8 +266,25 @@ function AdminPanel() {
             <p className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Diligencia titulo, area, recursos y contenido antes de publicar.</p>
           </div>
 
-          <div className="p-4 sm:p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="p-4 sm:p-8 space-y-6 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-6">
+            <div className={`rounded-2xl border p-4 lg:col-span-12 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-slate-50/70'}`}>
+              <div className="grid grid-cols-3 gap-3">
+                <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Imagenes</p>
+                  <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{imagenesSeleccionadas}</p>
+                </div>
+                <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Archivos</p>
+                  <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{archivosSeleccionados}</p>
+                </div>
+                <div className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Links</p>
+                  <p className={`text-xl font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{linksActivos}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:col-span-7">
               <div className="md:col-span-3 space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Titulo del comunicado</label>
                 <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
@@ -277,7 +297,7 @@ function AdminPanel() {
               </div>
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+            <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                 <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Imagenes del comunicado</p>
@@ -308,7 +328,7 @@ function AdminPanel() {
               )}
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+            <div className={`rounded-2xl border p-4 space-y-3 lg:col-span-5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                 <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Archivos adjuntos</p>
@@ -339,7 +359,7 @@ function AdminPanel() {
               )}
             </div>
 
-            <div className={`rounded-2xl border p-4 space-y-2 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+            <div className={`rounded-2xl border p-4 space-y-2 lg:col-span-7 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                   <p className={`text-sm font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Links externos</p>
@@ -355,12 +375,12 @@ function AdminPanel() {
               ))}
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 lg:col-span-7">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Cuerpo del mensaje</label>
               <textarea placeholder="Información sobre evento..." required rows="6" className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-gray-50 border-gray-100'}`} value={contenido} onChange={(e) => setContenido(e.target.value)}></textarea>
             </div>
 
-            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t ${darkMode ? 'border-slate-800' : 'border-gray-50'}`}>
+            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t lg:col-span-12 ${darkMode ? 'border-slate-800' : 'border-gray-50'}`}>
               <p className="text-[11px] text-slate-400 font-medium">Revisa que todo este correcto antes de publicar.</p>
               <button type="submit" disabled={loading} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-8 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[11px]">
                 {loading ? 'Guardando...' : 'Publicar'}
