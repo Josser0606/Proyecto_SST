@@ -1433,6 +1433,7 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
     const [rows] = await db.query(
       `SELECT 
         r.id, 
+        p.id AS publicacion_id,
         u.nombre_completo AS empleado, 
         u.area, 
         CASE 
@@ -1441,6 +1442,10 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
         END AS publicacion, 
         r.fecha_lectura,
         r.tipo_confirmacion,
+        COALESCE(rx.util, 0) AS reaccion_util,
+        COALESCE(rx.importante, 0) AS reaccion_importante,
+        COALESCE(rx.me_gusta, 0) AS reaccion_me_gusta,
+        (COALESCE(rx.util, 0) + COALESCE(rx.importante, 0) + COALESCE(rx.me_gusta, 0)) AS total_reacciones,
         CASE
           WHEN r.tipo_confirmacion = 'reconfirmacion' THEN 'Reconfirmaciones'
           ELSE 'Confirmaciones iniciales'
@@ -1448,6 +1453,15 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
       FROM registro_lecturas r
       INNER JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN publicaciones p ON r.publicacion_id = p.id
+      LEFT JOIN (
+        SELECT
+          publicacion_id,
+          SUM(CASE WHEN reaccion = 'util' THEN 1 ELSE 0 END) AS util,
+          SUM(CASE WHEN reaccion = 'importante' THEN 1 ELSE 0 END) AS importante,
+          SUM(CASE WHEN reaccion = 'me-gusta' THEN 1 ELSE 0 END) AS me_gusta
+        FROM publicacion_reacciones
+        GROUP BY publicacion_id
+      ) rx ON rx.publicacion_id = p.id
       WHERE COALESCE(r.oculto_reporte, 0) = 0
       ORDER BY r.fecha_lectura DESC`
     );

@@ -641,8 +641,8 @@ function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <h3 className="text-2xl font-black mb-4">{pub.titulo}</h3>
-                      <p className={`text-base leading-relaxed mb-6 whitespace-pre-line ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{pub.contenido}</p>
+                      <h3 className="text-2xl font-black mb-4 break-words [overflow-wrap:anywhere]">{pub.titulo}</h3>
+                      <p className={`text-base leading-relaxed mb-6 whitespace-pre-line break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{pub.contenido}</p>
 
                       {imagenesSecundarias.length > 0 && (
                         <div className={`mb-6 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>

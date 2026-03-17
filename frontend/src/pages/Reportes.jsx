@@ -55,6 +55,15 @@ function Reportes() {
     }).format(d);
   };
 
+  const resumenReaccionesTexto = (reg) => {
+    const util = Number(reg.reaccion_util || 0);
+    const importante = Number(reg.reaccion_importante || 0);
+    const meGusta = Number(reg.reaccion_me_gusta || 0);
+    const total = Number(reg.total_reacciones || 0);
+    if (total <= 0) return 'Sin reacciones';
+    return `${total} total · U:${util} I:${importante} MG:${meGusta}`;
+  };
+
   const obtenerReporte = async () => {
     try {
       const res = await axios.get(apiUrl('/api/reportes'));
@@ -99,6 +108,61 @@ function Reportes() {
     return Object.entries(grupos)
       .sort((a, b) => (orden[a[0]] || 99) - (orden[b[0]] || 99))
       .map(([categoria, registros]) => ({ categoria, registros }));
+  }, [datosFiltrados]);
+
+  const resumenReaccionesAuditoria = useMemo(() => {
+    const map = new Map();
+    datosFiltrados.forEach((reg) => {
+      const key = reg.publicacion_id || reg.publicacion;
+      const prev = map.get(key) || { total: 0, util: 0, importante: 0, meGusta: 0 };
+      const next = {
+        total: Math.max(prev.total, Number(reg.total_reacciones || 0)),
+        util: Math.max(prev.util, Number(reg.reaccion_util || 0)),
+        importante: Math.max(prev.importante, Number(reg.reaccion_importante || 0)),
+        meGusta: Math.max(prev.meGusta, Number(reg.reaccion_me_gusta || 0))
+      };
+      map.set(key, next);
+    });
+    const values = Array.from(map.values());
+    const totalReacciones = values.reduce((acc, v) => acc + v.total, 0);
+    const totalUtil = values.reduce((acc, v) => acc + v.util, 0);
+    const totalImportante = values.reduce((acc, v) => acc + v.importante, 0);
+    const totalMeGusta = values.reduce((acc, v) => acc + v.meGusta, 0);
+    return {
+      comunicadosConReacciones: values.filter((v) => v.total > 0).length,
+      totalReacciones,
+      totalUtil,
+      totalImportante,
+      totalMeGusta
+    };
+  }, [datosFiltrados]);
+
+  const topComunicadosReaccionados = useMemo(() => {
+    const map = new Map();
+    datosFiltrados.forEach((reg) => {
+      const key = reg.publicacion_id || reg.publicacion;
+      const prev = map.get(key) || {
+        id: key,
+        titulo: reg.publicacion || 'Sin titulo',
+        total: 0,
+        util: 0,
+        importante: 0,
+        meGusta: 0
+      };
+      const next = {
+        ...prev,
+        titulo: reg.publicacion || prev.titulo,
+        total: Math.max(prev.total, Number(reg.total_reacciones || 0)),
+        util: Math.max(prev.util, Number(reg.reaccion_util || 0)),
+        importante: Math.max(prev.importante, Number(reg.reaccion_importante || 0)),
+        meGusta: Math.max(prev.meGusta, Number(reg.reaccion_me_gusta || 0))
+      };
+      map.set(key, next);
+    });
+    return Array.from(map.values())
+      .filter((item) => item.total > 0)
+      .sort((a, b) => b.total - a.total || a.titulo.localeCompare(b.titulo))
+      .slice(0, 5);
   }, [datosFiltrados]);
 
   const conteoPorFecha = useMemo(() => {
@@ -185,6 +249,7 @@ function Reportes() {
         <td>${escaparHtml(r.comunicado)}</td>
         <td>${escaparHtml(r.empleado)}</td>
         <td>${escaparHtml(r.area)}</td>
+        <td>${escaparHtml(r.reacciones)}</td>
         <td>${escaparHtml(r.tipo_confirmacion)}</td>
         <td>${escaparHtml(r.fecha_confirmacion)}</td>
       </tr>
@@ -197,6 +262,7 @@ function Reportes() {
             <th>Comunicado</th>
             <th>Empleado</th>
             <th>Area</th>
+            <th>Reacciones</th>
             <th>Tipo</th>
             <th>Fecha de Confirmacion</th>
           </tr>
@@ -234,6 +300,7 @@ function Reportes() {
       comunicado: reg.publicacion || '',
       empleado: reg.empleado || '',
       area: reg.area || '',
+      reacciones: resumenReaccionesTexto(reg),
       tipo_confirmacion: reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial',
       fecha_confirmacion: formatearFechaLectura(reg.fecha_lectura)
     }));
@@ -575,6 +642,72 @@ function Reportes() {
           </span>
         </div>
 
+        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Impacto por reacciones</h2>
+            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Auditoria</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicados</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.comunicadosConReacciones}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Total</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{resumenReaccionesAuditoria.totalReacciones}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Util</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalUtil}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Importante</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalImportante}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Me gusta</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalMeGusta}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Top 5 comunicados mas reaccionados</h2>
+            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ranking</span>
+          </div>
+          {topComunicadosReaccionados.length === 0 ? (
+            <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Aun no hay reacciones registradas para construir el top.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {topComunicadosReaccionados.map((item, idx) => (
+                <article
+                  key={`top-rx-${item.id}-${idx}`}
+                  className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
+                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className={`text-xs font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                      #{idx + 1} {item.titulo}
+                    </p>
+                    <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      U:{item.util} · I:{item.importante} · MG:{item.meGusta}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                    darkMode ? 'bg-green-900/30 text-green-200 border border-green-700' : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {item.total} reacciones
+                  </span>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
         <section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
         }`}>
@@ -779,6 +912,9 @@ function Reportes() {
                                 </button>
                               </div>
                             </div>
+                            <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Reacciones: {resumenReaccionesTexto(reg)}
+                            </p>
                           </article>
                         ))}
                       </div>
@@ -825,6 +961,9 @@ function Reportes() {
                         </button>
                       </div>
                     </div>
+                    <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Reacciones: {resumenReaccionesTexto(reg)}
+                    </p>
                   </article>
                 ))
               )
@@ -874,6 +1013,7 @@ function Reportes() {
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
                             </tr>
@@ -904,6 +1044,9 @@ function Reportes() {
                                     </span>
                                   </div>
                                 </td>
+                                <td className={`px-6 py-4 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                  {resumenReaccionesTexto(reg)}
+                                </td>
                                 <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {formatearFechaLectura(reg.fecha_lectura)}
                                 </td>
@@ -933,6 +1076,7 @@ function Reportes() {
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
                     </tr>
@@ -962,6 +1106,9 @@ function Reportes() {
                               {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
                             </span>
                           </div>
+                        </td>
+                        <td className={`px-8 py-5 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {resumenReaccionesTexto(reg)}
                         </td>
                         <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {formatearFechaLectura(reg.fecha_lectura)}
