@@ -26,6 +26,7 @@ function AdminPanel() {
   const [links, setLinks] = useState(['']);
   const [loading, setLoading] = useState(false);
   const [portadaPreviewUrl, setPortadaPreviewUrl] = useState('');
+  const [imagenesPreviewUrls, setImagenesPreviewUrls] = useState([]);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const navigate = useNavigate();
@@ -84,6 +85,17 @@ function AdminPanel() {
     const localUrl = URL.createObjectURL(portada);
     setPortadaPreviewUrl(localUrl);
     return () => URL.revokeObjectURL(localUrl);
+  }, [imagenesInputs]);
+
+  useEffect(() => {
+    const seleccionadas = imagenesInputs.filter(Boolean);
+    if (seleccionadas.length === 0) {
+      setImagenesPreviewUrls([]);
+      return undefined;
+    }
+    const urls = seleccionadas.map((file) => URL.createObjectURL(file));
+    setImagenesPreviewUrls(urls);
+    return () => urls.forEach((url) => URL.revokeObjectURL(url));
   }, [imagenesInputs]);
 
   const handleSubmit = async (e) => {
@@ -349,6 +361,23 @@ function AdminPanel() {
               <p className={`text-xs font-bold ${imagenesInputs.filter(Boolean).length > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {imagenesInputs.filter(Boolean).length > 0 ? `${imagenesInputs.filter(Boolean).length} imagen(es) agregada(s)` : 'No hay imagenes agregadas'}
               </p>
+              {imagenesPreviewUrls.length > 0 && (
+                <div className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-900/80' : 'border-gray-200 bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Miniaturas</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {imagenesPreviewUrls.map((url, idx) => (
+                      <div key={`${url}-${idx}`} className="relative rounded-lg overflow-hidden border border-slate-200">
+                        <img src={url} alt={`Imagen ${idx + 1}`} className="w-full h-20 object-cover" />
+                        {idx === 0 && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-600 text-white text-[9px] font-black uppercase tracking-wide">
+                            Portada
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {imagenesInputs.filter(Boolean).length > 0 && (
                 <ul className={`text-xs rounded-lg p-3 space-y-1 border max-h-28 overflow-auto ${darkMode ? 'text-slate-300 bg-slate-900 border-slate-700' : 'text-slate-600 bg-white border-gray-200'}`}>
                   {imagenesInputs.filter(Boolean).map((f, i) => <li key={`${f.name}-${i}`}>{i === 0 ? `Portada: ${f.name}` : f.name}</li>)}
