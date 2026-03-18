@@ -675,21 +675,6 @@ function Dashboard() {
             </div>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-2">
-              <button
-                title={`Filtro actual: ${categoriaFiltro}`}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition ${
-                  darkMode
-                    ? 'border-slate-700 bg-slate-900/40 text-slate-300 hover:bg-slate-800 hover:text-white'
-                    : 'border-gray-200 bg-white text-slate-600 hover:bg-green-50 hover:text-green-800'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h10M4 18h16"></path>
-                </svg>
-              </button>
-              {usuario?.rol === 'admin' && (
-                <div className="w-8 h-px bg-slate-300/40 my-1"></div>
-              )}
               {usuario?.rol === 'admin' && (
                 <div className="flex flex-col gap-2">
                   <button
