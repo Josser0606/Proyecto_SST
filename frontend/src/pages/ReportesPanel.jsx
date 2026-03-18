@@ -274,9 +274,9 @@ function ReportesPanel() {
           <button onClick={toggleDarkMode} className={`p-2.5 rounded-xl ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}>
             {darkMode ? 'Light' : 'Dark'}
           </button>
-          <div className={`text-right border-r pr-4 hidden sm:block ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
-            <p className="text-sm font-black">{usuarioActual?.nombre_completo}</p>
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest">{usuarioActual?.area}</p>
+          <div className={`text-right border-r pr-2 sm:pr-4 min-w-0 ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
+            <p className="text-xs sm:text-sm font-black max-w-[140px] sm:max-w-none truncate">{usuarioActual?.nombre_completo}</p>
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuarioActual?.area}</p>
           </div>
           <button onClick={() => navigate('/dashboard')} className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
