@@ -165,6 +165,68 @@ function Reportes() {
       .slice(0, 5);
   }, [datosFiltrados]);
 
+  const notificacionesOperativas = useMemo(() => {
+    const list = [];
+    const hoy = toLocalYmd(new Date());
+    const confirmacionesHoy = datosFiltrados.filter((reg) => {
+      const d = parseFechaLectura(reg.fecha_lectura);
+      if (!d || Number.isNaN(d.getTime())) return false;
+      return toLocalYmd(d) === hoy;
+    }).length;
+
+    const reconfirmaciones = datosFiltrados.filter((reg) => (
+      (reg.tipo_confirmacion || '').toLowerCase() === 'reconfirmacion'
+    )).length;
+
+    if (confirmacionesHoy > 0) {
+      list.push({
+        id: 'hoy',
+        titulo: 'Actividad del dia',
+        detalle: `${confirmacionesHoy} confirmacion(es) registradas hoy.`,
+        nivel: 'ok'
+      });
+    }
+
+    if (reconfirmaciones > 0) {
+      list.push({
+        id: 'reconfirmaciones',
+        titulo: 'Reconfirmaciones activas',
+        detalle: `${reconfirmaciones} registro(s) de reconfirmacion en auditoria.`,
+        nivel: 'warn'
+      });
+    }
+
+    if (resumenReaccionesAuditoria.totalReacciones === 0 && datosFiltrados.length > 0) {
+      list.push({
+        id: 'sin-reacciones',
+        titulo: 'Sin reaccion del personal',
+        detalle: 'Aun no hay reacciones registradas en los comunicados auditados.',
+        nivel: 'info'
+      });
+    }
+
+    if (topComunicadosReaccionados.length > 0) {
+      const top = topComunicadosReaccionados[0];
+      list.push({
+        id: 'top',
+        titulo: 'Comunicado mas comentado',
+        detalle: `"${top.titulo}" lidera con ${top.total} reaccion(es).`,
+        nivel: 'ok'
+      });
+    }
+
+    if (list.length === 0) {
+      list.push({
+        id: 'sin-alertas',
+        titulo: 'Sin alertas operativas',
+        detalle: 'La auditoria no presenta eventos pendientes en este momento.',
+        nivel: 'info'
+      });
+    }
+
+    return list.slice(0, 4);
+  }, [datosFiltrados, resumenReaccionesAuditoria.totalReacciones, topComunicadosReaccionados]);
+
   const conteoPorFecha = useMemo(() => {
     const acc = {};
     datosFiltrados.forEach((reg) => {
@@ -546,7 +608,7 @@ function Reportes() {
           )}
         </aside>
 
-      <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
+      <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
         <div className="max-w-6xl mx-auto">
         <div className="lg:hidden grid grid-cols-4 gap-2 mb-4">
           <button onClick={() => navigate('/dashboard')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
@@ -641,6 +703,30 @@ function Reportes() {
             {datosFiltrados.length} registro(s) en {datosAgrupadosPorCategoria.length} categoria(s)
           </span>
         </div>
+
+        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Notificaciones operativas</h2>
+            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              {notificacionesOperativas.length} alerta(s)
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {notificacionesOperativas.map((item) => {
+              const styleByLevel = item.nivel === 'warn'
+                ? (darkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50')
+                : item.nivel === 'ok'
+                  ? (darkMode ? 'border-green-700 bg-green-900/20' : 'border-green-200 bg-green-50')
+                  : (darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70');
+              return (
+                <article key={item.id} className={`rounded-xl border p-3 ${styleByLevel}`}>
+                  <p className={`text-xs font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{item.titulo}</p>
+                  <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{item.detalle}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
 
         <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
           <div className="flex items-center justify-between gap-2 mb-3">

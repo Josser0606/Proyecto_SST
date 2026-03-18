@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiEdit2, FiHeart, FiThumbsUp, FiTrash2, FiZap } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiEdit2, FiHeart, FiThumbsUp, FiTrash2, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 
@@ -26,6 +26,8 @@ function Dashboard() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsSeen, setNotificationsSeen] = useState({});
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState({
@@ -47,11 +49,40 @@ function Dashboard() {
   }, []);
   const navigate = useNavigate();
   const cargandoPublicacionesRef = useRef(false);
+  const notificationPanelRef = useRef(null);
   const REACCIONES_DISPONIBLES = [
     { key: 'util', label: 'Util', icon: FiThumbsUp },
     { key: 'importante', label: 'Importante', icon: FiZap },
     { key: 'me-gusta', label: 'Me gusta', icon: FiHeart }
   ];
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+    try {
+      const stored = JSON.parse(localStorage.getItem(`dashboard_notifications_seen_${usuario.id}`) || '{}');
+      setNotificationsSeen(stored && typeof stored === 'object' ? stored : {});
+    } catch {
+      setNotificationsSeen({});
+    }
+  }, [usuario?.id]);
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+    localStorage.setItem(`dashboard_notifications_seen_${usuario.id}`, JSON.stringify(notificationsSeen));
+  }, [notificationsSeen, usuario?.id]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!notificationPanelRef.current) return;
+      if (!notificationPanelRef.current.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+    if (notificationsOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [notificationsOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -267,6 +298,76 @@ function Dashboard() {
   const totalPublicaciones = publicaciones.length;
   const totalLeidas = publicaciones.filter((p) => Number(p.leido) > 0).length;
   const totalPendientes = Math.max(totalPublicaciones - totalLeidas, 0);
+  const totalReaccionesPropias = publicaciones.filter((p) => Boolean(p.reaccion_usuario)).length;
+  const totalPendientesReconfirmar = publicaciones.filter((p) => Number(p.requiere_reconfirmacion) > 0 && Number(p.puede_confirmar_lectura) > 0 && Number(p.leido) === 0).length;
+  const ultimaLectura = publicaciones
+    .filter((p) => Number(p.leido) > 0 && p.fecha_lectura)
+    .map((p) => new Date(p.fecha_lectura))
+    .filter((d) => !Number.isNaN(d.getTime()))
+    .sort((a, b) => b - a)[0] || null;
+
+  const notificaciones = useMemo(() => {
+    const list = [];
+    publicaciones.forEach((pub) => {
+      const leido = Number(pub.leido) > 0;
+      const requiereReconfirmacion = Number(pub.requiere_reconfirmacion) > 0;
+      const puedeConfirmar = Number(pub.puede_confirmar_lectura) > 0;
+      const fechaPublicacion = pub.fecha_publicacion ? new Date(pub.fecha_publicacion) : null;
+
+      if (!leido && requiereReconfirmacion && puedeConfirmar) {
+        list.push({
+          id: `reconfirmar-${pub.id}`,
+          prioridad: 1,
+          titulo: 'Reconfirmacion pendiente',
+          detalle: pub.titulo || 'Comunicado sin titulo',
+          categoria: pub.categoria || 'General'
+        });
+      } else if (!leido && puedeConfirmar) {
+        list.push({
+          id: `pendiente-${pub.id}`,
+          prioridad: 2,
+          titulo: 'Lectura pendiente',
+          detalle: pub.titulo || 'Comunicado sin titulo',
+          categoria: pub.categoria || 'General'
+        });
+      } else if (!leido && !puedeConfirmar) {
+        list.push({
+          id: `vencido-${pub.id}`,
+          prioridad: 3,
+          titulo: 'Plazo vencido',
+          detalle: pub.titulo || 'Comunicado sin titulo',
+          categoria: pub.categoria || 'General'
+        });
+      }
+
+      if (fechaPublicacion && !Number.isNaN(fechaPublicacion.getTime())) {
+        const hoursAgo = (Date.now() - fechaPublicacion.getTime()) / (1000 * 60 * 60);
+        if (hoursAgo <= 24) {
+          list.push({
+            id: `nuevo-${pub.id}`,
+            prioridad: 4,
+            titulo: 'Nuevo comunicado',
+            detalle: pub.titulo || 'Comunicado sin titulo',
+            categoria: pub.categoria || 'General'
+          });
+        }
+      }
+    });
+
+    return list
+      .sort((a, b) => a.prioridad - b.prioridad)
+      .slice(0, 12);
+  }, [publicaciones]);
+
+  const notificacionesNoVistas = notificaciones.filter((item) => !notificationsSeen[item.id]).length;
+
+  const marcarNotificacionesComoVistas = () => {
+    const next = { ...notificationsSeen };
+    notificaciones.forEach((item) => {
+      next[item.id] = true;
+    });
+    setNotificationsSeen(next);
+  };
 
   return (
     <div className={`min-h-screen flex flex-col overflow-x-hidden transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-gray-50 text-slate-900'}`}>
@@ -280,6 +381,68 @@ function Dashboard() {
           title="Ir al dashboard"
         />
         <div className="flex items-center gap-2 sm:gap-4">
+          <div className="relative" ref={notificationPanelRef}>
+            <button
+              onClick={() => setNotificationsOpen((prev) => !prev)}
+              className={`relative p-2.5 rounded-xl transition-all ${
+                darkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-gray-100 text-slate-600 hover:bg-gray-200'
+              }`}
+              title="Notificaciones"
+            >
+              <FiBell className="w-5 h-5" />
+              {notificacionesNoVistas > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-green-600 text-white text-[10px] font-black flex items-center justify-center">
+                  {notificacionesNoVistas > 9 ? '9+' : notificacionesNoVistas}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className={`absolute right-0 mt-2 w-[300px] sm:w-[360px] rounded-2xl border p-3 shadow-2xl z-[60] ${
+                darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <p className={`text-xs font-black uppercase tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Notificaciones</p>
+                  <button
+                    type="button"
+                    onClick={marcarNotificacionesComoVistas}
+                    className={`text-[11px] font-black px-2.5 py-1 rounded-lg border transition ${
+                      darkMode ? 'border-slate-700 text-slate-200 hover:border-green-500 hover:text-green-300' : 'border-gray-200 text-slate-600 hover:border-green-300 hover:text-green-700'
+                    }`}
+                  >
+                    Marcar vistas
+                  </button>
+                </div>
+                {notificaciones.length === 0 ? (
+                  <p className={`text-sm py-4 text-center ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No hay novedades por ahora.</p>
+                ) : (
+                  <div className="max-h-80 overflow-y-auto sidebar-scroll space-y-2 pr-1">
+                    {notificaciones.map((item) => {
+                      const seen = Boolean(notificationsSeen[item.id]);
+                      return (
+                        <div
+                          key={item.id}
+                          className={`rounded-xl border px-3 py-2.5 transition ${
+                            seen
+                              ? (darkMode ? 'border-slate-800 bg-slate-950/40' : 'border-gray-200 bg-gray-50')
+                              : (darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50')
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className={`text-xs font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{item.titulo}</p>
+                              <p className={`text-xs truncate ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{item.detalle}</p>
+                              <p className={`text-[10px] mt-1 uppercase tracking-widest ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{item.categoria}</p>
+                            </div>
+                            {!seen && <FiCheckCircle className="w-4 h-4 text-green-500 shrink-0" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <button onClick={toggleDarkMode} className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}>
             {darkMode ? 'Claro' : 'Oscuro'}
           </button>
@@ -452,7 +615,7 @@ function Dashboard() {
           )}
         </aside>
 
-        <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-72'}`}>
+        <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
           <div className="max-w-6xl mx-auto">
           <div className="lg:hidden mb-4 space-y-3">
             <div className="relative">
@@ -539,6 +702,36 @@ function Dashboard() {
                 <p className={`text-xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
               </div>
             </div>
+          </section>
+
+          <section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
+            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
+          }`}>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi actividad</h2>
+              <span className={`text-[10px] uppercase tracking-widest font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Personal</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
+                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Leidos</p>
+                <p className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
+              </div>
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/70'}`}>
+                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
+                <p className={`text-xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
+              </div>
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
+                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Reacciones</p>
+                <p className={`text-xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalReaccionesPropias}</p>
+              </div>
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/70'}`}>
+                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
+                <p className={`text-xl font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
+              </div>
+            </div>
+            <p className={`mt-3 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}
+            </p>
           </section>
 
           <input type="text" placeholder="Buscar comunicado por titulo o contenido..." className={`w-full px-4 sm:px-6 py-3 sm:py-4 mb-6 sm:mb-10 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
