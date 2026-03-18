@@ -884,6 +884,7 @@ function Dashboard() {
             <input
               type="text"
               placeholder="Buscar por titulo, contenido, categoria, archivos o links..."
+              list="dashboard-search-hints"
               className={`w-full px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`}
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
@@ -892,42 +893,33 @@ function Dashboard() {
                 if (e.key === 'Enter') registrarBusqueda(busqueda);
               }}
             />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {DASHBOARD_SEARCH_SCOPES.map((scope) => (
-                <button
-                  key={`scope-${scope.key}`}
-                  type="button"
-                  onClick={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
-                  className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition ${
-                    searchScopes[scope.key]
-                      ? 'bg-green-600 text-white border-green-600'
-                      : darkMode
-                        ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600'
-                        : 'border-gray-200 bg-white text-slate-600 hover:border-green-300'
-                  }`}
-                >
-                  {scope.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <datalist id="dashboard-search-hints">
               {sugerenciasBusqueda.map((item) => (
-                <button
-                  key={`hint-${item}`}
-                  type="button"
-                  onClick={() => {
-                    setBusqueda(item);
-                    registrarBusqueda(item);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] border ${
-                    darkMode
-                      ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600 hover:text-green-300'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
-                  }`}
-                >
-                  {item}
-                </button>
+                <option key={`hint-${item}`} value={item} />
               ))}
+            </datalist>
+            <div className="mt-2">
+              <details className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-white/90'}`}>
+                <summary className={`cursor-pointer list-none text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  Campos de busqueda ({Object.values(searchScopes).filter(Boolean).length} activos)
+                </summary>
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {DASHBOARD_SEARCH_SCOPES.map((scope) => (
+                    <label
+                      key={`scope-${scope.key}`}
+                      className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-2 py-1.5 border ${darkMode ? 'border-slate-700 text-slate-300' : 'border-gray-200 text-slate-600'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={searchScopes[scope.key]}
+                        onChange={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
+                        className="accent-green-600"
+                      />
+                      {scope.label}
+                    </label>
+                  ))}
+                </div>
+              </details>
             </div>
           </div>
 

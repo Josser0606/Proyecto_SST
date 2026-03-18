@@ -749,6 +749,7 @@ function Reportes() {
               <input
                 type="text"
                 placeholder="Buscar por empleado, area o comunicado..."
+                list="reportes-search-hints"
                 className={`w-full pl-10 pr-4 py-3 rounded-2xl border focus:outline-none focus:ring-2 focus:ring-green-500 font-medium ${
                   darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200 shadow-sm'
                 }`}
@@ -760,6 +761,11 @@ function Reportes() {
                 }}
               />
             </div>
+            <datalist id="reportes-search-hints">
+              {sugerenciasBusqueda.map((item) => (
+                <option key={`rp-hint-opt-${item}`} value={item} />
+              ))}
+            </datalist>
 
             <select
               value={formatoExportacion}
@@ -786,44 +792,28 @@ function Reportes() {
           </div>
         </div>
 
-        <div className="mb-5 space-y-2">
-          <div className="flex flex-wrap gap-2">
-            {REPORTES_SEARCH_SCOPES.map((scope) => (
-              <button
-                key={`rp-scope-${scope.key}`}
-                type="button"
-                onClick={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
-                className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition ${
-                  searchScopes[scope.key]
-                    ? 'bg-green-600 text-white border-green-600'
-                    : darkMode
-                      ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600'
-                      : 'border-gray-200 bg-white text-slate-600 hover:border-green-300'
-                }`}
-              >
-                {scope.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {sugerenciasBusqueda.map((item) => (
-              <button
-                key={`rp-hint-${item}`}
-                type="button"
-                onClick={() => {
-                  setFiltro(item);
-                  registrarBusqueda(item);
-                }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] border ${
-                  darkMode
-                    ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600 hover:text-green-300'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
+        <div className="mb-5">
+          <details className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-white/90'}`}>
+            <summary className={`cursor-pointer list-none text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              Campos de busqueda ({Object.values(searchScopes).filter(Boolean).length} activos)
+            </summary>
+            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+              {REPORTES_SEARCH_SCOPES.map((scope) => (
+                <label
+                  key={`rp-scope-${scope.key}`}
+                  className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-2 py-1.5 border ${darkMode ? 'border-slate-700 text-slate-300' : 'border-gray-200 text-slate-600'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={searchScopes[scope.key]}
+                    onChange={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
+                    className="accent-green-600"
+                  />
+                  {scope.label}
+                </label>
+              ))}
+            </div>
+          </details>
         </div>
 
         
