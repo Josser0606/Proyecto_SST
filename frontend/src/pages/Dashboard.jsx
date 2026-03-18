@@ -18,6 +18,30 @@ const CATEGORIAS = [
   'Direccion'
 ];
 
+const SEARCH_KEY_DASHBOARD = 'dashboard_search_history_v1';
+const DASHBOARD_SEARCH_SCOPES = [
+  { key: 'titulo', label: 'Titulo' },
+  { key: 'contenido', label: 'Contenido' },
+  { key: 'categoria', label: 'Categoria' },
+  { key: 'recursos', label: 'Archivos/Links' }
+];
+const DASHBOARD_SUGERENCIAS_BASE = [
+  'capacitacion',
+  'seguridad',
+  'auditoria',
+  'procedimiento',
+  'sst',
+  'calidad'
+];
+
+const normalizarTexto = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .trim();
+
+const escaparRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 function Dashboard() {
   const [publicaciones, setPublicaciones] = useState([]);
   const [categoriaFiltro, setCategoriaFiltro] = useState('Todas');
@@ -26,6 +50,20 @@ function Dashboard() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [searchScopes, setSearchScopes] = useState({
+    titulo: true,
+    contenido: true,
+    categoria: true,
+    recursos: true
+  });
+  const [searchHistory, setSearchHistory] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SEARCH_KEY_DASHBOARD) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsSeen, setNotificationsSeen] = useState({});
 
@@ -140,6 +178,16 @@ function Dashboard() {
     setSidebarCollapsed(next);
     localStorage.setItem('sidebarCollapsed', String(next));
   };
+
+  const registrarBusqueda = useCallback((value) => {
+    const term = String(value || '').trim();
+    if (!term) return;
+    setSearchHistory((prev) => {
+      const next = [term, ...prev.filter((item) => normalizarTexto(item) !== normalizarTexto(term))].slice(0, 8);
+      localStorage.setItem(SEARCH_KEY_DASHBOARD, JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
   const marcarComoLeido = async (pubId, esReconfirmacion = false) => {
     const loadingToast = toast.loading('Registrando lectura...');
@@ -289,11 +337,83 @@ function Dashboard() {
     }
   };
 
-  const publicacionesFiltradas = publicaciones.filter((pub) => {
-    const coincideCat = categoriaFiltro === 'Todas' || pub.categoria === categoriaFiltro;
-    const term = busqueda.toLowerCase();
-    return coincideCat && ((pub.titulo || '').toLowerCase().includes(term) || (pub.contenido || '').toLowerCase().includes(term));
-  });
+  const publicacionesFiltradas = useMemo(() => {
+    const term = normalizarTexto(busqueda);
+    const tokens = term.split(/\s+/).filter(Boolean);
+
+    const enabledScopes = Object.entries(searchScopes)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+    const scopes = enabledScopes.length ? enabledScopes : DASHBOARD_SEARCH_SCOPES.map((s) => s.key);
+
+    const filtered = publicaciones
+      .filter((pub) => categoriaFiltro === 'Todas' || pub.categoria === categoriaFiltro)
+      .map((pub, idx) => {
+        if (!tokens.length) return { pub, idx, score: 0 };
+
+        const recursosTexto = (pub.recursos || [])
+          .map((r) => `${r?.nombre || ''} ${r?.url || ''} ${r?.tipo || ''}`)
+          .join(' ');
+        const fields = {
+          titulo: normalizarTexto(pub.titulo),
+          contenido: normalizarTexto(pub.contenido),
+          categoria: normalizarTexto(pub.categoria),
+          recursos: normalizarTexto(recursosTexto)
+        };
+
+        let score = 0;
+        const allMatch = tokens.every((tk) => {
+          let matched = false;
+          scopes.forEach((scope) => {
+            const value = fields[scope] || '';
+            if (value.includes(tk)) {
+              matched = true;
+              if (scope === 'titulo') score += 6;
+              if (scope === 'contenido') score += 3;
+              if (scope === 'categoria') score += 4;
+              if (scope === 'recursos') score += 2;
+            }
+          });
+          return matched;
+        });
+
+        return { pub, idx, score, allMatch };
+      })
+      .filter((item) => !tokens.length || item.allMatch)
+      .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
+      .map((item) => item.pub);
+
+    return filtered;
+  }, [publicaciones, categoriaFiltro, busqueda, searchScopes]);
+
+  const sugerenciasBusqueda = useMemo(() => {
+    const term = normalizarTexto(busqueda);
+    const pool = [...searchHistory, ...DASHBOARD_SUGERENCIAS_BASE];
+    const unique = Array.from(new Map(pool.map((item) => [normalizarTexto(item), item])).values());
+    return unique
+      .filter((item) => !term || normalizarTexto(item).includes(term))
+      .slice(0, 6);
+  }, [searchHistory, busqueda]);
+
+  const highlightText = useCallback((text) => {
+    const raw = String(text || '');
+    const query = String(busqueda || '').trim();
+    if (!query) return raw;
+    const tokens = Array.from(new Set(query.split(/\s+/).filter(Boolean).map((t) => escaparRegExp(t))));
+    if (!tokens.length) return raw;
+    const regex = new RegExp(`(${tokens.join('|')})`, 'gi');
+    const parts = raw.split(regex);
+    return parts.map((part, i) => {
+      const isMatch = tokens.some((tk) => new RegExp(`^${tk}$`, 'i').test(part));
+      return isMatch
+        ? (
+          <mark key={`${part}-${i}`} className={`px-0.5 rounded ${darkMode ? 'bg-emerald-500/30 text-emerald-100' : 'bg-emerald-100 text-emerald-900'}`}>
+            {part}
+          </mark>
+        )
+        : <span key={`${part}-${i}`}>{part}</span>;
+    });
+  }, [busqueda, darkMode]);
 
   const totalPublicaciones = publicaciones.length;
   const totalLeidas = publicaciones.filter((p) => Number(p.leido) > 0).length;
@@ -681,60 +801,135 @@ function Dashboard() {
             )}
           </div>
 
-          <section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
+          <section className={`mb-6 rounded-3xl border p-4 sm:p-6 ${
+            darkMode ? 'bg-gradient-to-br from-slate-900 to-slate-900/90 border-slate-800 shadow-2xl shadow-black/20' : 'bg-white border-gray-100 shadow-md shadow-slate-200/60'
           }`}>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Resumen del Tablero</h2>
-              <span className={`text-[10px] uppercase tracking-widest font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicados</span>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${darkMode ? 'bg-green-400' : 'bg-green-600'}`}></span>
+                <h2 className={`text-base sm:text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Resumen del Tablero</h2>
+              </div>
+              <span className={`text-[10px] uppercase tracking-[0.18em] font-black px-2 py-1 rounded-full ${
+                darkMode ? 'text-slate-300 bg-slate-800 border border-slate-700' : 'text-slate-500 bg-slate-100 border border-slate-200'
+              }`}>
+                Comunicados
+              </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
-              </div>
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Leidos</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalLeidas}</p>
-              </div>
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
+                darkMode ? 'border-slate-700 bg-slate-800/70 hover:border-slate-600' : 'border-slate-200 bg-slate-50/80 hover:bg-white'
+              }`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
+                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-slate-600' : 'bg-slate-300'}`}></div>
+              </article>
+              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
+                darkMode ? 'border-green-800 bg-green-900/20 hover:border-green-700' : 'border-green-200 bg-green-50/90 hover:bg-green-50'
+              }`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Leidos</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalLeidas}</p>
+                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-green-500/70' : 'bg-green-400'}`}></div>
+              </article>
+              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
+                darkMode ? 'border-amber-800 bg-amber-900/20 hover:border-amber-700' : 'border-amber-200 bg-amber-50/90 hover:bg-amber-50'
+              }`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
+                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-amber-500/70' : 'bg-amber-400'}`}></div>
+              </article>
             </div>
           </section>
 
-          <section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
-            darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
+          <section className={`mb-6 rounded-3xl border p-4 sm:p-6 ${
+            darkMode ? 'bg-gradient-to-br from-slate-900 to-slate-900/90 border-slate-800 shadow-2xl shadow-black/20' : 'bg-white border-gray-100 shadow-md shadow-slate-200/60'
           }`}>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi actividad</h2>
-              <span className={`text-[10px] uppercase tracking-widest font-bold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Personal</span>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${darkMode ? 'bg-sky-400' : 'bg-sky-600'}`}></span>
+                <h2 className={`text-base sm:text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi actividad</h2>
+              </div>
+              <span className={`text-[10px] uppercase tracking-[0.18em] font-black px-2 py-1 rounded-full ${
+                darkMode ? 'text-slate-300 bg-slate-800 border border-slate-700' : 'text-slate-500 bg-slate-100 border border-slate-200'
+              }`}>
+                Personal
+              </span>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Leidos</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
-              </div>
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
-              </div>
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Reacciones</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalReaccionesPropias}</p>
-              </div>
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/70'}`}>
-                <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
-                <p className={`text-xl font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
-              </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/80'}`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Leidos</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
+              </article>
+              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/90'}`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
+              </article>
+              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/90'}`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Reacciones</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalReaccionesPropias}</p>
+              </article>
+              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/90'}`}>
+                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
+                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
+              </article>
             </div>
-            <p className={`mt-3 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}
-            </p>
+            <div className={`mt-4 rounded-xl px-3 py-2.5 border text-xs flex items-center gap-2 ${
+              darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'
+            }`}>
+              <FiCheckCircle className={`w-4 h-4 ${darkMode ? 'text-green-300' : 'text-green-700'}`} />
+              <span>Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}</span>
+            </div>
           </section>
 
-          <input type="text" placeholder="Buscar comunicado por titulo o contenido..." className={`w-full px-4 sm:px-6 py-3 sm:py-4 mb-6 sm:mb-10 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          <div className="mb-6 sm:mb-10">
+            <input
+              type="text"
+              placeholder="Buscar por titulo, contenido, categoria, archivos o links..."
+              className={`w-full px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`}
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              onBlur={() => registrarBusqueda(busqueda)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') registrarBusqueda(busqueda);
+              }}
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {DASHBOARD_SEARCH_SCOPES.map((scope) => (
+                <button
+                  key={`scope-${scope.key}`}
+                  type="button"
+                  onClick={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
+                  className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition ${
+                    searchScopes[scope.key]
+                      ? 'bg-green-600 text-white border-green-600'
+                      : darkMode
+                        ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600'
+                        : 'border-gray-200 bg-white text-slate-600 hover:border-green-300'
+                  }`}
+                >
+                  {scope.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {sugerenciasBusqueda.map((item) => (
+                <button
+                  key={`hint-${item}`}
+                  type="button"
+                  onClick={() => {
+                    setBusqueda(item);
+                    registrarBusqueda(item);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] border ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600 hover:text-green-300'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="space-y-12">
             {publicacionesFiltradas.length === 0 && (
@@ -844,8 +1039,8 @@ function Dashboard() {
                     </div>
                   ) : (
                     <>
-                      <h3 className="text-2xl font-black mb-4 break-words [overflow-wrap:anywhere]">{pub.titulo}</h3>
-                      <p className={`text-base leading-relaxed mb-6 whitespace-pre-line break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{pub.contenido}</p>
+                      <h3 className="text-2xl font-black mb-4 break-words [overflow-wrap:anywhere]">{highlightText(pub.titulo)}</h3>
+                      <p className={`text-base leading-relaxed mb-6 whitespace-pre-line break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{highlightText(pub.contenido)}</p>
 
                       {imagenesSecundarias.length > 0 && (
                         <div className={`mb-6 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>

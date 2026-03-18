@@ -5,6 +5,25 @@ import toast from 'react-hot-toast';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
+const SEARCH_KEY_REPORTES = 'reportes_search_history_v1';
+const REPORTES_SEARCH_SCOPES = [
+  { key: 'comunicado', label: 'Comunicado' },
+  { key: 'empleado', label: 'Empleado' },
+  { key: 'area', label: 'Area' },
+  { key: 'categoria', label: 'Categoria' },
+  { key: 'tipo', label: 'Tipo' },
+  { key: 'reacciones', label: 'Reacciones' }
+];
+const REPORTES_SUGERENCIAS_BASE = ['reconfirmacion', 'confirmacion', 'sst', 'calidad', 'importante', 'util'];
+
+const normalizarTexto = (value) => String(value || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .trim();
+
+const escaparRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 function Reportes() {
   const [reporte, setReporte] = useState([]);
   const [filtro, setFiltro] = useState('');
@@ -18,6 +37,22 @@ function Reportes() {
   const [fechaCalendarioSeleccionada, setFechaCalendarioSeleccionada] = useState('');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
+  const [searchScopes, setSearchScopes] = useState({
+    comunicado: true,
+    empleado: true,
+    area: true,
+    categoria: true,
+    tipo: true,
+    reacciones: true
+  });
+  const [searchHistory, setSearchHistory] = useState(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(SEARCH_KEY_REPORTES) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const navigate = useNavigate();
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
 
@@ -64,6 +99,16 @@ function Reportes() {
     return `${total} total · U:${util} I:${importante} MG:${meGusta}`;
   };
 
+  const registrarBusqueda = (value) => {
+    const term = String(value || '').trim();
+    if (!term) return;
+    setSearchHistory((prev) => {
+      const next = [term, ...prev.filter((item) => normalizarTexto(item) !== normalizarTexto(term))].slice(0, 8);
+      localStorage.setItem(SEARCH_KEY_REPORTES, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const obtenerReporte = async () => {
     try {
       const res = await axios.get(apiUrl('/api/reportes'));
@@ -86,15 +131,80 @@ function Reportes() {
   }, [navigate]);
 
   const datosFiltrados = useMemo(() => {
-    const t = filtro.toLowerCase().trim();
-    return reporte.filter((reg) =>
-      (reg.empleado || '').toLowerCase().includes(t) ||
-      (reg.publicacion || '').toLowerCase().includes(t) ||
-      (reg.area || '').toLowerCase().includes(t) ||
-      (reg.tipo_confirmacion || '').toLowerCase().includes(t) ||
-      (reg.categoria_auditoria || '').toLowerCase().includes(t)
-    );
-  }, [reporte, filtro]);
+    const term = normalizarTexto(filtro);
+    const tokens = term.split(/\s+/).filter(Boolean);
+    const enabledScopes = Object.entries(searchScopes)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => key);
+    const scopes = enabledScopes.length ? enabledScopes : REPORTES_SEARCH_SCOPES.map((s) => s.key);
+
+    const list = reporte
+      .map((reg, idx) => {
+        if (!tokens.length) return { reg, idx, score: 0, allMatch: true };
+        const fields = {
+          comunicado: normalizarTexto(reg.publicacion),
+          empleado: normalizarTexto(reg.empleado),
+          area: normalizarTexto(reg.area),
+          categoria: normalizarTexto(reg.categoria_auditoria),
+          tipo: normalizarTexto(reg.tipo_confirmacion === 'reconfirmacion' ? 'reconfirmacion' : 'confirmacion inicial'),
+          reacciones: normalizarTexto(resumenReaccionesTexto(reg))
+        };
+
+        let score = 0;
+        const allMatch = tokens.every((tk) => {
+          let matched = false;
+          scopes.forEach((scope) => {
+            const value = fields[scope] || '';
+            if (value.includes(tk)) {
+              matched = true;
+              if (scope === 'comunicado') score += 6;
+              if (scope === 'empleado') score += 5;
+              if (scope === 'area') score += 4;
+              if (scope === 'categoria') score += 3;
+              if (scope === 'tipo') score += 2;
+              if (scope === 'reacciones') score += 1;
+            }
+          });
+          return matched;
+        });
+
+        return { reg, idx, score, allMatch };
+      })
+      .filter((item) => item.allMatch)
+      .sort((a, b) => (b.score - a.score) || (a.idx - b.idx))
+      .map((item) => item.reg);
+
+    return list;
+  }, [reporte, filtro, searchScopes]);
+
+  const sugerenciasBusqueda = useMemo(() => {
+    const term = normalizarTexto(filtro);
+    const pool = [...searchHistory, ...REPORTES_SUGERENCIAS_BASE];
+    const unique = Array.from(new Map(pool.map((item) => [normalizarTexto(item), item])).values());
+    return unique
+      .filter((item) => !term || normalizarTexto(item).includes(term))
+      .slice(0, 6);
+  }, [searchHistory, filtro]);
+
+  const highlightText = (text) => {
+    const raw = String(text || '');
+    const query = String(filtro || '').trim();
+    if (!query) return raw;
+    const tokens = Array.from(new Set(query.split(/\s+/).filter(Boolean).map((t) => escaparRegExp(t))));
+    if (!tokens.length) return raw;
+    const regex = new RegExp(`(${tokens.join('|')})`, 'gi');
+    const parts = raw.split(regex);
+    return parts.map((part, i) => {
+      const isMatch = tokens.some((tk) => new RegExp(`^${tk}$`, 'i').test(part));
+      return isMatch
+        ? (
+          <mark key={`${part}-${i}`} className={`px-0.5 rounded ${darkMode ? 'bg-emerald-500/30 text-emerald-100' : 'bg-emerald-100 text-emerald-900'}`}>
+            {part}
+          </mark>
+        )
+        : <span key={`${part}-${i}`}>{part}</span>;
+    });
+  };
 
   const datosAgrupadosPorCategoria = useMemo(() => {
     const grupos = datosFiltrados.reduce((acc, reg) => {
@@ -644,6 +754,10 @@ function Reportes() {
                 }`}
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
+                onBlur={() => registrarBusqueda(filtro)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') registrarBusqueda(filtro);
+                }}
               />
             </div>
 
@@ -672,37 +786,47 @@ function Reportes() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setVistaAuditoria('categorias')}
-            className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition ${
-              vistaAuditoria === 'categorias'
-                ? 'bg-green-600 text-white border-green-600'
-                : darkMode
-                  ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'
-                  : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
-            }`}
-          >
-            Por categorias
-          </button>
-          <button
-            type="button"
-            onClick={() => setVistaAuditoria('lista')}
-            className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition ${
-              vistaAuditoria === 'lista'
-                ? 'bg-green-600 text-white border-green-600'
-                : darkMode
-                  ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'
-                  : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
-            }`}
-          >
-            Vista general
-          </button>
-          <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            {datosFiltrados.length} registro(s) en {datosAgrupadosPorCategoria.length} categoria(s)
-          </span>
+        <div className="mb-5 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {REPORTES_SEARCH_SCOPES.map((scope) => (
+              <button
+                key={`rp-scope-${scope.key}`}
+                type="button"
+                onClick={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
+                className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-wider transition ${
+                  searchScopes[scope.key]
+                    ? 'bg-green-600 text-white border-green-600'
+                    : darkMode
+                      ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600'
+                      : 'border-gray-200 bg-white text-slate-600 hover:border-green-300'
+                }`}
+              >
+                {scope.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sugerenciasBusqueda.map((item) => (
+              <button
+                key={`rp-hint-${item}`}
+                type="button"
+                onClick={() => {
+                  setFiltro(item);
+                  registrarBusqueda(item);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] border ${
+                  darkMode
+                    ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-600 hover:text-green-300'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
+
+        
 
         <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
           <div className="flex items-center justify-between gap-2 mb-3">
@@ -720,7 +844,7 @@ function Reportes() {
                   : (darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70');
               return (
                 <article key={item.id} className={`rounded-xl border p-3 ${styleByLevel}`}>
-                  <p className={`text-xs font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{item.titulo}</p>
+                  <p className={`text-xs font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(item.titulo)}</p>
                   <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{item.detalle}</p>
                 </article>
               );
@@ -728,73 +852,336 @@ function Reportes() {
           </div>
         </section>
 
-        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Impacto por reacciones</h2>
-            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Auditoria</span>
+        <div className={`rounded-[1.5rem] sm:rounded-[2.5rem] shadow-xl border overflow-hidden ${
+          darkMode ? 'bg-slate-900 border-slate-800 shadow-black/30' : 'bg-white border-gray-100 shadow-slate-200/60'
+        }`}>
+          <div className={`px-4 sm:px-6 pt-4 pb-3 border-b ${darkMode ? 'border-slate-800 bg-slate-900/70' : 'border-gray-100 bg-white'}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVistaAuditoria('categorias')}
+                className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition ${
+                  vistaAuditoria === 'categorias'
+                    ? 'bg-green-600 text-white border-green-600'
+                    : darkMode
+                      ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'
+                      : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                }`}
+              >
+                Por categorias
+              </button>
+              <button
+                type="button"
+                onClick={() => setVistaAuditoria('lista')}
+                className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider border transition ${
+                  vistaAuditoria === 'lista'
+                    ? 'bg-green-600 text-white border-green-600'
+                    : darkMode
+                      ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800'
+                      : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                }`}
+              >
+                Vista general
+              </button>
+              <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                {datosFiltrados.length} registro(s) en {datosAgrupadosPorCategoria.length} categoria(s)
+              </span>
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicados</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.comunicadosConReacciones}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Total</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{resumenReaccionesAuditoria.totalReacciones}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Util</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalUtil}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Importante</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalImportante}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Me gusta</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalMeGusta}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Top 5 comunicados mas reaccionados</h2>
-            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ranking</span>
-          </div>
-          {topComunicadosReaccionados.length === 0 ? (
-            <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Aun no hay reacciones registradas para construir el top.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {topComunicadosReaccionados.map((item, idx) => (
-                <article
-                  key={`top-rx-${item.id}-${idx}`}
-                  className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
-                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className={`text-xs font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      #{idx + 1} {item.titulo}
-                    </p>
-                    <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      U:{item.util} · I:{item.importante} · MG:{item.meGusta}
-                    </p>
-                  </div>
-                  <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                    darkMode ? 'bg-green-900/30 text-green-200 border border-green-700' : 'bg-green-50 text-green-700 border border-green-200'
+          <div className="md:hidden p-3 space-y-3">
+            {datosFiltrados.length > 0 ? (
+              vistaAuditoria === 'categorias' ? (
+                datosAgrupadosPorCategoria.map((grupo) => (
+                  <section key={`mobile-group-${grupo.categoria}`} className={`rounded-2xl border p-3 ${
+                    darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-green-100 bg-green-50/40'
                   }`}>
-                    {item.total} reacciones
-                  </span>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+                    <button
+                      type="button"
+                      onClick={() => toggleCategoria(grupo.categoria)}
+                      className="w-full mb-2 flex items-center justify-between gap-2 text-left"
+                    >
+                      <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{grupo.categoria}</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                          darkMode ? 'border-green-700 bg-green-900/30 text-green-200' : 'border-green-200 bg-white text-green-700'
+                        }`}>
+                          {grupo.registros.length} registro(s)
+                        </span>
+                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border ${
+                          darkMode ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-green-200 bg-white text-green-700'
+                        }`}>
+                          <svg className={`w-4 h-4 transition-transform ${categoriasAbiertas[grupo.categoria] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                          </svg>
+                        </span>
+                      </div>
+                    </button>
 
-        <section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
+                    {categoriasAbiertas[grupo.categoria] && (
+                      <div className="space-y-2">
+                        {grupo.registros.map((reg, index) => (
+                          <article key={`mobile-${grupo.categoria}-${index}`} className={`rounded-2xl border p-4 ${
+                            darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-gray-200 bg-white'
+                          }`}>
+                            <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                            <div className="mt-2">
+                              <p className={`font-bold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
+                              <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                  darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                                }`}>
+                                  {highlightText(reg.area)}
+                                </span>
+                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                  reg.tipo_confirmacion === 'reconfirmacion'
+                                    ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                    : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                }`}>
+                                  {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {formatearFechaLectura(reg.fecha_lectura)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarReporte(reg.id)}
+                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                                    darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                                  }`}
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </div>
+                            <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Reacciones: {resumenReaccionesTexto(reg)}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))
+              ) : (
+                datosFiltrados.map((reg, index) => (
+                  <article key={`mobile-${index}`} className={`rounded-2xl border p-4 ${
+                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-gray-200 bg-gray-50/70'
+                  }`}>
+                    <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                    <div className="mt-2">
+                      <p className={`font-bold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
+                      <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                          darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                        }`}>
+                          {highlightText(reg.area)}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                          reg.tipo_confirmacion === 'reconfirmacion'
+                            ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                            : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                        }`}>
+                          {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {formatearFechaLectura(reg.fecha_lectura)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => eliminarReporte(reg.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                            darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          }`}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                    <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Reacciones: {resumenReaccionesTexto(reg)}
+                    </p>
+                  </article>
+                ))
+              )
+            ) : (
+              <div className="py-16 text-center">
+                <p className="text-gray-400 font-bold italic tracking-tight">No hay evidencias registradas con ese filtro.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
+            {datosFiltrados.length > 0 ? (
+              vistaAuditoria === 'categorias' ? (
+                <div className="p-4 space-y-4">
+                  {datosAgrupadosPorCategoria.map((grupo) => (
+                    <section key={`desktop-group-${grupo.categoria}`} className={`rounded-2xl border overflow-hidden ${
+                      darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-green-100 bg-white'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoria(grupo.categoria)}
+                        className={`w-full px-6 py-3 flex items-center justify-between border-b text-left ${
+                          darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-green-100 bg-green-50/70'
+                        }`}
+                      >
+                        <h3 className={`font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{grupo.categoria}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                            darkMode ? 'border-green-700 bg-green-900/30 text-green-200' : 'border-green-200 bg-white text-green-700'
+                          }`}>
+                            {grupo.registros.length} registro(s)
+                          </span>
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border ${
+                            darkMode ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-green-200 bg-white text-green-700'
+                          }`}>
+                            <svg className={`w-4 h-4 transition-transform ${categoriasAbiertas[grupo.categoria] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                          </span>
+                        </div>
+                      </button>
+
+                      {categoriasAbiertas[grupo.categoria] && (
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className={darkMode ? 'bg-green-700/90 text-white' : 'bg-green-600 text-white'}>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
+                            {grupo.registros.map((reg, index) => (
+                              <tr key={`${grupo.categoria}-${index}`} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
+                                <td className="px-6 py-4">
+                                  <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
+                                  <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                                      darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                    }`}>
+                                      {highlightText(reg.area)}
+                                    </span>
+                                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                      reg.tipo_confirmacion === 'reconfirmacion'
+                                        ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                        : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                    }`}>
+                                      {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className={`px-6 py-4 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                                  {resumenReaccionesTexto(reg)}
+                                </td>
+                                <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {formatearFechaLectura(reg.fecha_lectura)}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => eliminarReporte(reg.id)}
+                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
+                                      darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                                    }`}
+                                  >
+                                    Eliminar
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className={darkMode ? 'bg-green-700 text-white' : 'bg-green-600 text-white'}>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
+                    {datosFiltrados.map((reg, index) => (
+                      <tr key={index} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
+                        <td className="px-8 py-5">
+                          <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                        </td>
+                        <td className="px-8 py-5">
+                          <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
+                          <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                        </td>
+                        <td className="px-8 py-5">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                              darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              {highlightText(reg.area)}
+                            </span>
+                            <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                              reg.tipo_confirmacion === 'reconfirmacion'
+                                ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                            }`}>
+                              {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={`px-8 py-5 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {resumenReaccionesTexto(reg)}
+                        </td>
+                        <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {formatearFechaLectura(reg.fecha_lectura)}
+                        </td>
+                        <td className="px-8 py-5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => eliminarReporte(reg.id)}
+                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
+                              darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                            }`}
+                          >
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            ) : (
+              <div className="py-24 text-center">
+                <p className="text-gray-400 font-bold italic tracking-tight">No hay evidencias registradas con ese filtro.</p>
+              </div>
+            )}
+          </div>
+<section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
           darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
         }`}>
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -916,7 +1303,7 @@ function Reportes() {
                     <span key={`pub-dia-${idx}`} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
                       darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'
                     }`}>
-                      {reg.publicacion}
+                      {highlightText(reg.publicacion)}
                     </span>
                   ))}
                 </div>
@@ -925,302 +1312,75 @@ function Reportes() {
           </div>
         </section>
 
-        <div className={`rounded-[1.5rem] sm:rounded-[2.5rem] shadow-xl border overflow-hidden ${
-          darkMode ? 'bg-slate-900 border-slate-800 shadow-black/30' : 'bg-white border-gray-100 shadow-slate-200/60'
-        }`}>
-          <div className="md:hidden p-3 space-y-3">
-            {datosFiltrados.length > 0 ? (
-              vistaAuditoria === 'categorias' ? (
-                datosAgrupadosPorCategoria.map((grupo) => (
-                  <section key={`mobile-group-${grupo.categoria}`} className={`rounded-2xl border p-3 ${
-                    darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-green-100 bg-green-50/40'
-                  }`}>
-                    <button
-                      type="button"
-                      onClick={() => toggleCategoria(grupo.categoria)}
-                      className="w-full mb-2 flex items-center justify-between gap-2 text-left"
-                    >
-                      <h3 className={`text-sm font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{grupo.categoria}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                          darkMode ? 'border-green-700 bg-green-900/30 text-green-200' : 'border-green-200 bg-white text-green-700'
-                        }`}>
-                          {grupo.registros.length} registro(s)
-                        </span>
-                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg border ${
-                          darkMode ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-green-200 bg-white text-green-700'
-                        }`}>
-                          <svg className={`w-4 h-4 transition-transform ${categoriasAbiertas[grupo.categoria] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                          </svg>
-                        </span>
-                      </div>
-                    </button>
+        
+<section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Impacto por reacciones</h2>
+            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Auditoria</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicados</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.comunicadosConReacciones}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Total</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{resumenReaccionesAuditoria.totalReacciones}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Util</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalUtil}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Importante</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalImportante}</p>
+            </div>
+            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
+              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Me gusta</p>
+              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalMeGusta}</p>
+            </div>
+          </div>
+        </section>
 
-                    {categoriasAbiertas[grupo.categoria] && (
-                      <div className="space-y-2">
-                        {grupo.registros.map((reg, index) => (
-                          <article key={`mobile-${grupo.categoria}-${index}`} className={`rounded-2xl border p-4 ${
-                            darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-gray-200 bg-white'
-                          }`}>
-                            <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{reg.publicacion}</p>
-                            <div className="mt-2">
-                              <p className={`font-bold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{reg.empleado || 'Nombre no registrado'}</p>
-                              <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
-                            </div>
-                            <div className="mt-3 flex items-center justify-between gap-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                  darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                                }`}>
-                                  {reg.area}
-                                </span>
-                                <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                  reg.tipo_confirmacion === 'reconfirmacion'
-                                    ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                                    : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                                }`}>
-                                  {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {formatearFechaLectura(reg.fecha_lectura)}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => eliminarReporte(reg.id)}
-                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                                    darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
-                                  }`}
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-                            </div>
-                            <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Reacciones: {resumenReaccionesTexto(reg)}
-                            </p>
-                          </article>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ))
-              ) : (
-                datosFiltrados.map((reg, index) => (
-                  <article key={`mobile-${index}`} className={`rounded-2xl border p-4 ${
-                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-gray-200 bg-gray-50/70'
-                  }`}>
-                    <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{reg.publicacion}</p>
-                    <div className="mt-2">
-                      <p className={`font-bold text-sm ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{reg.empleado || 'Nombre no registrado'}</p>
-                      <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                          darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
-                        }`}>
-                          {reg.area}
-                        </span>
-                        <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                          reg.tipo_confirmacion === 'reconfirmacion'
-                            ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                            : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                        }`}>
-                          {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[11px] font-mono text-right ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {formatearFechaLectura(reg.fecha_lectura)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => eliminarReporte(reg.id)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                            darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
-                          }`}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                    <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Reacciones: {resumenReaccionesTexto(reg)}
+        
+<section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Top 5 comunicados mas reaccionados</h2>
+            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ranking</span>
+          </div>
+          {topComunicadosReaccionados.length === 0 ? (
+            <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Aun no hay reacciones registradas para construir el top.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {topComunicadosReaccionados.map((item, idx) => (
+                <article
+                  key={`top-rx-${item.id}-${idx}`}
+                  className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
+                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className={`text-xs font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                      #{idx + 1} {highlightText(item.titulo)}
                     </p>
-                  </article>
-                ))
-              )
-            ) : (
-              <div className="py-16 text-center">
-                <p className="text-gray-400 font-bold italic tracking-tight">No hay evidencias registradas con ese filtro.</p>
-              </div>
-            )}
-          </div>
+                    <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      U:{item.util} · I:{item.importante} · MG:{item.meGusta}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                    darkMode ? 'bg-green-900/30 text-green-200 border border-green-700' : 'bg-green-50 text-green-700 border border-green-200'
+                  }`}>
+                    {item.total} reacciones
+                  </span>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
 
-          <div className="hidden md:block overflow-x-auto">
-            {datosFiltrados.length > 0 ? (
-              vistaAuditoria === 'categorias' ? (
-                <div className="p-4 space-y-4">
-                  {datosAgrupadosPorCategoria.map((grupo) => (
-                    <section key={`desktop-group-${grupo.categoria}`} className={`rounded-2xl border overflow-hidden ${
-                      darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-green-100 bg-white'
-                    }`}>
-                      <button
-                        type="button"
-                        onClick={() => toggleCategoria(grupo.categoria)}
-                        className={`w-full px-6 py-3 flex items-center justify-between border-b text-left ${
-                          darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-green-100 bg-green-50/70'
-                        }`}
-                      >
-                        <h3 className={`font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{grupo.categoria}</h3>
-                        <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                            darkMode ? 'border-green-700 bg-green-900/30 text-green-200' : 'border-green-200 bg-white text-green-700'
-                          }`}>
-                            {grupo.registros.length} registro(s)
-                          </span>
-                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg border ${
-                            darkMode ? 'border-slate-600 bg-slate-800 text-slate-200' : 'border-green-200 bg-white text-green-700'
-                          }`}>
-                            <svg className={`w-4 h-4 transition-transform ${categoriasAbiertas[grupo.categoria] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
-                          </span>
-                        </div>
-                      </button>
-
-                      {categoriasAbiertas[grupo.categoria] && (
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className={darkMode ? 'bg-green-700/90 text-white' : 'bg-green-600 text-white'}>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
-                            {grupo.registros.map((reg, index) => (
-                              <tr key={`${grupo.categoria}-${index}`} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                                <td className="px-6 py-4">
-                                  <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{reg.publicacion}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{reg.empleado || 'Nombre no registrado'}</p>
-                                  <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                                      darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                    }`}>
-                                      {reg.area}
-                                    </span>
-                                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                      reg.tipo_confirmacion === 'reconfirmacion'
-                                        ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                                        : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                                    }`}>
-                                      {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className={`px-6 py-4 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                  {resumenReaccionesTexto(reg)}
-                                </td>
-                                <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {formatearFechaLectura(reg.fecha_lectura)}
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => eliminarReporte(reg.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
-                                      darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
-                                    }`}
-                                  >
-                                    Eliminar
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className={darkMode ? 'bg-green-700 text-white' : 'bg-green-600 text-white'}>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
-                    {datosFiltrados.map((reg, index) => (
-                      <tr key={index} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                        <td className="px-8 py-5">
-                          <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{reg.publicacion}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                          <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{reg.empleado || 'Nombre no registrado'}</p>
-                          <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                              darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
-                              {reg.area}
-                            </span>
-                            <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                              reg.tipo_confirmacion === 'reconfirmacion'
-                                ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                                : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                            }`}>
-                              {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={`px-8 py-5 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {resumenReaccionesTexto(reg)}
-                        </td>
-                        <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {formatearFechaLectura(reg.fecha_lectura)}
-                        </td>
-                        <td className="px-8 py-5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => eliminarReporte(reg.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
-                              darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
-                            }`}
-                          >
-                            Eliminar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )
-            ) : (
-              <div className="py-24 text-center">
-                <p className="text-gray-400 font-bold italic tracking-tight">No hay evidencias registradas con ese filtro.</p>
-              </div>
-            )}
-          </div>
+        
         </div>
         </div>
       </main>
