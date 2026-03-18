@@ -684,6 +684,21 @@ function Reportes() {
                   </span>
                   Auditoria
                 </button>
+                <button
+                  onClick={() => navigate('/reportes-panel')}
+                  className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white'
+                      : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                  }`}
+                >
+                  <span className={`w-5 h-5 rounded-md flex items-center justify-center ${darkMode ? 'bg-slate-700/80' : 'bg-slate-100'}`}>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 19h16M7 16V9m5 7V5m5 11v-6"></path>
+                    </svg>
+                  </span>
+                  Panel
+                </button>
               </div>
             </div>
           ) : (
@@ -714,13 +729,20 @@ function Reportes() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 3v18h18M7 14l3-3 3 2 4-5"></path>
                 </svg>
               </button>
+              <button onClick={() => navigate('/reportes-panel')} className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
+                darkMode ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+              }`} title="Panel analitico">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 19h16M7 16V9m5 7V5m5 11v-6"></path>
+                </svg>
+              </button>
             </div>
           )}
         </aside>
 
       <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
         <div className="max-w-6xl mx-auto">
-        <div className="lg:hidden grid grid-cols-4 gap-2 mb-4">
+        <div className="lg:hidden grid grid-cols-5 gap-2 mb-4">
           <button onClick={() => navigate('/dashboard')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
             Inicio
           </button>
@@ -733,9 +755,12 @@ function Reportes() {
           <button onClick={() => navigate('/reportes')} className="px-2 py-2.5 rounded-xl bg-green-600 text-white text-[11px] font-black">
             Auditoria
           </button>
+          <button onClick={() => navigate('/reportes-panel')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+            Panel
+          </button>
         </div>
 
-        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-6 sm:mb-10 gap-4 sm:gap-6">
+        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-4 sm:mb-6 gap-4 sm:gap-5">
           <div className="min-w-0">
             <h1 className={`text-2xl sm:text-4xl 2xl:text-[2.8rem] leading-[1] font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>Auditoria de Lectura</h1>
             <p className={`${darkMode ? 'text-slate-400' : 'text-gray-500'} font-medium`}>Historico de lecturas por cominicado</p>
@@ -749,7 +774,6 @@ function Reportes() {
               <input
                 type="text"
                 placeholder="Buscar por empleado, area o comunicado..."
-                list="reportes-search-hints"
                 className={`w-full pl-10 pr-4 py-3 rounded-2xl border focus:outline-none focus:ring-2 focus:ring-green-500 font-medium ${
                   darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200 shadow-sm'
                 }`}
@@ -760,12 +784,23 @@ function Reportes() {
                   if (e.key === 'Enter') registrarBusqueda(filtro);
                 }}
               />
+              {filtro.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setFiltro('')}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg border flex items-center justify-center ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-red-500 hover:text-red-300'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-red-300 hover:text-red-600'
+                  }`}
+                  title="Limpiar busqueda"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" d="M6 6l12 12M18 6l-12 12"></path>
+                  </svg>
+                </button>
+              )}
             </div>
-            <datalist id="reportes-search-hints">
-              {sugerenciasBusqueda.map((item) => (
-                <option key={`rp-hint-opt-${item}`} value={item} />
-              ))}
-            </datalist>
 
             <select
               value={formatoExportacion}
@@ -792,56 +827,14 @@ function Reportes() {
           </div>
         </div>
 
-        <div className="mb-5">
-          <details className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-white/90'}`}>
-            <summary className={`cursor-pointer list-none text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-              Campos de busqueda ({Object.values(searchScopes).filter(Boolean).length} activos)
-            </summary>
-            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {REPORTES_SEARCH_SCOPES.map((scope) => (
-                <label
-                  key={`rp-scope-${scope.key}`}
-                  className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-2 py-1.5 border ${darkMode ? 'border-slate-700 text-slate-300' : 'border-gray-200 text-slate-600'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={searchScopes[scope.key]}
-                    onChange={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
-                    className="accent-green-600"
-                  />
-                  {scope.label}
-                </label>
-              ))}
-            </div>
-          </details>
+        <div className="mb-3 flex items-center justify-between">
+          <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            Busqueda inteligente por empleado, comunicado, area, categoria y tipo.
+          </p>
+          <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            {datosFiltrados.length} resultado(s)
+          </p>
         </div>
-
-        
-
-        <section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Notificaciones operativas</h2>
-            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              {notificacionesOperativas.length} alerta(s)
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {notificacionesOperativas.map((item) => {
-              const styleByLevel = item.nivel === 'warn'
-                ? (darkMode ? 'border-amber-700 bg-amber-900/20' : 'border-amber-200 bg-amber-50')
-                : item.nivel === 'ok'
-                  ? (darkMode ? 'border-green-700 bg-green-900/20' : 'border-green-200 bg-green-50')
-                  : (darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70');
-              return (
-                <article key={item.id} className={`rounded-xl border p-3 ${styleByLevel}`}>
-                  <p className={`text-xs font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(item.titulo)}</p>
-                  <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{item.detalle}</p>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
         <div className={`rounded-[1.5rem] sm:rounded-[2.5rem] shadow-xl border overflow-hidden ${
           darkMode ? 'bg-slate-900 border-slate-800 shadow-black/30' : 'bg-white border-gray-100 shadow-slate-200/60'
         }`}>
@@ -1171,206 +1164,6 @@ function Reportes() {
               </div>
             )}
           </div>
-<section className={`mb-6 rounded-2xl border p-4 sm:p-5 ${
-          darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'
-        }`}>
-          <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Calendario de actividad</h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => cambiarMesCalendario(-1)}
-                className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                  darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-gray-200 bg-white text-slate-700'
-                }`}
-                title="Mes anterior"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
-                </svg>
-              </button>
-              <span className={`text-xs sm:text-sm font-black capitalize ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{etiquetaMesCalendario}</span>
-              <button
-                type="button"
-                onClick={() => cambiarMesCalendario(1)}
-                className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                  darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-gray-200 bg-white text-slate-700'
-                }`}
-                title="Mes siguiente"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-3">
-            <div>
-              <label className={`block text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                Ir a fecha
-              </label>
-              <input
-                type="date"
-                value={fechaCalendarioSeleccionada}
-                onChange={(e) => irAFechaCalendario(e.target.value)}
-                className={`px-3 py-2 rounded-xl border text-sm ${
-                  darkMode ? 'border-slate-700 bg-slate-900 text-slate-100' : 'border-gray-200 bg-white text-slate-700'
-                }`}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={irAHoyCalendario}
-              className="px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-black uppercase tracking-wider"
-            >
-              Hoy
-            </button>
-            <button
-              type="button"
-              onClick={limpiarSeleccionCalendario}
-              className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider border ${
-                darkMode ? 'border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800' : 'border-gray-200 bg-white text-slate-700 hover:bg-gray-50'
-              }`}
-            >
-              Limpiar
-            </button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1.5 text-center mb-2">
-            {['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((d, i) => (
-              <span key={`${d}-${i}`} className={`text-[10px] font-black uppercase ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{d}</span>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7 gap-1.5">
-            {diasCalendario.map((celda, idx) => (
-              <div key={`cal-${idx}`} className="min-h-[44px]">
-                {celda ? (
-                  <button
-                    type="button"
-                    onClick={() => setFechaCalendarioSeleccionada(celda.ymd)}
-                    className={`w-full h-full rounded-lg border p-1.5 text-left transition ${
-                      fechaCalendarioSeleccionada === celda.ymd
-                        ? 'bg-green-600 border-green-600 text-white'
-                        : darkMode
-                          ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
-                          : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-black">{celda.dia}</span>
-                      {celda.count > 0 && (
-                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
-                          fechaCalendarioSeleccionada === celda.ymd ? 'bg-white/20 text-white' : darkMode ? 'bg-green-900/40 text-green-200' : 'bg-green-100 text-green-700'
-                        }`}>
-                          {celda.count}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ) : (
-                  <div className="w-full h-full"></div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className={`mt-4 rounded-xl border p-3 ${
-            darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50/70'
-          }`}>
-            {!fechaCalendarioSeleccionada ? (
-              <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Selecciona un dia para ver publicaciones registradas en auditoria.</p>
-            ) : publicacionesPorFechaSeleccionada.length === 0 ? (
-              <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>No hay registros para la fecha seleccionada.</p>
-            ) : (
-              <div className="space-y-2">
-                <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  {publicacionesPorFechaSeleccionada.length} registro(s) el {fechaCalendarioSeleccionada}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {publicacionesPorFechaSeleccionada.slice(0, 12).map((reg, idx) => (
-                    <span key={`pub-dia-${idx}`} className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
-                      darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'
-                    }`}>
-                      {highlightText(reg.publicacion)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        
-<section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Impacto por reacciones</h2>
-            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Auditoria</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicados</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.comunicadosConReacciones}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/70'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Total</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{resumenReaccionesAuditoria.totalReacciones}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Util</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalUtil}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Importante</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalImportante}</p>
-            </div>
-            <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-white'}`}>
-              <p className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Me gusta</p>
-              <p className={`text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{resumenReaccionesAuditoria.totalMeGusta}</p>
-            </div>
-          </div>
-        </section>
-
-        
-<section className={`mb-6 rounded-2xl border p-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className={`text-sm sm:text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Top 5 comunicados mas reaccionados</h2>
-            <span className={`text-[10px] uppercase tracking-wider font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ranking</span>
-          </div>
-          {topComunicadosReaccionados.length === 0 ? (
-            <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Aun no hay reacciones registradas para construir el top.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {topComunicadosReaccionados.map((item, idx) => (
-                <article
-                  key={`top-rx-${item.id}-${idx}`}
-                  className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${
-                    darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/70'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className={`text-xs font-black ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                      #{idx + 1} {highlightText(item.titulo)}
-                    </p>
-                    <p className={`text-[11px] mt-1 font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      U:{item.util} · I:{item.importante} · MG:{item.meGusta}
-                    </p>
-                  </div>
-                  <span className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                    darkMode ? 'bg-green-900/30 text-green-200 border border-green-700' : 'bg-green-50 text-green-700 border border-green-200'
-                  }`}>
-                    {item.total} reacciones
-                  </span>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-
-        
         </div>
         </div>
       </main>
@@ -1380,3 +1173,5 @@ function Reportes() {
 }
 
 export default Reportes;
+
+

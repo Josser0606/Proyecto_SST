@@ -644,10 +644,10 @@ function Dashboard() {
                     </span>
                     Empleados
                   </button>
-                <button
-                  onClick={() => navigate('/reportes')}
-                  className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
-                    darkMode
+                  <button
+                    onClick={() => navigate('/reportes')}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
+                      darkMode
                         ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white'
                         : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
                     }`}
@@ -658,6 +658,21 @@ function Dashboard() {
                       </svg>
                     </span>
                     Auditoria
+                  </button>
+                  <button
+                    onClick={() => navigate('/reportes-panel')}
+                    className={`w-full text-left px-3 py-2.5 rounded-xl border font-bold text-sm transition-all flex items-center gap-2 ${
+                      darkMode
+                        ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white'
+                        : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded-md flex items-center justify-center ${darkMode ? 'bg-slate-700/80' : 'bg-slate-100'}`}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 19h16M7 16V9m5 7V5m5 11v-6"></path>
+                      </svg>
+                    </span>
+                    Panel
                   </button>
                 </div>
               )}
@@ -724,9 +739,22 @@ function Dashboard() {
                         : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
                     }`}
                     title="Auditoria"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 3v18h18M7 14l3-3 3 2 4-5"></path>
+                      </svg>
+                  </button>
+                  <button
+                    onClick={() => navigate('/reportes-panel')}
+                    className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${
+                      darkMode
+                        ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white'
+                        : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                    }`}
+                    title="Panel analitico"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 3v18h18M7 14l3-3 3 2 4-5"></path>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 19h16M7 16V9m5 7V5m5 11v-6"></path>
                     </svg>
                   </button>
                 </div>
@@ -784,7 +812,7 @@ function Dashboard() {
               )}
             </div>
             {usuario?.rol === 'admin' && (
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <button onClick={() => navigate('/dashboard')} className="px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-black">
                   Inicio
                 </button>
@@ -796,6 +824,9 @@ function Dashboard() {
                 </button>
                 <button onClick={() => navigate('/reportes')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
                   Auditoria
+                </button>
+                <button onClick={() => navigate('/reportes-panel')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+                  Panel
                 </button>
               </div>
             )}
@@ -880,50 +911,47 @@ function Dashboard() {
             </div>
           </section>
 
-          <div className="mb-6 sm:mb-10">
-            <input
-              type="text"
-              placeholder="Buscar por titulo, contenido, categoria, archivos o links..."
-              list="dashboard-search-hints"
-              className={`w-full px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`}
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              onBlur={() => registrarBusqueda(busqueda)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') registrarBusqueda(busqueda);
-              }}
-            />
-            <datalist id="dashboard-search-hints">
-              {sugerenciasBusqueda.map((item) => (
-                <option key={`hint-${item}`} value={item} />
-              ))}
-            </datalist>
-            <div className="mt-2">
-              <details className={`rounded-xl border px-3 py-2 ${darkMode ? 'border-slate-700 bg-slate-900/70' : 'border-gray-200 bg-white/90'}`}>
-                <summary className={`cursor-pointer list-none text-[11px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                  Campos de busqueda ({Object.values(searchScopes).filter(Boolean).length} activos)
-                </summary>
-                <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {DASHBOARD_SEARCH_SCOPES.map((scope) => (
-                    <label
-                      key={`scope-${scope.key}`}
-                      className={`flex items-center gap-2 text-xs font-semibold rounded-lg px-2 py-1.5 border ${darkMode ? 'border-slate-700 text-slate-300' : 'border-gray-200 text-slate-600'}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={searchScopes[scope.key]}
-                        onChange={() => setSearchScopes((prev) => ({ ...prev, [scope.key]: !prev[scope.key] }))}
-                        className="accent-green-600"
-                      />
-                      {scope.label}
-                    </label>
-                  ))}
-                </div>
-              </details>
+          <div className="mb-4 sm:mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Buscar por titulo, contenido, categoria, archivos o links..."
+                className={`w-full px-4 sm:px-6 py-3 sm:py-4 rounded-2xl border outline-none transition-all ${darkMode ? 'bg-slate-900 border-slate-700 focus:border-green-500 text-white' : 'bg-white border-gray-200 focus:border-green-500 shadow-sm'}`}
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                onBlur={() => registrarBusqueda(busqueda)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') registrarBusqueda(busqueda);
+                }}
+              />
+              {busqueda.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setBusqueda('')}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg border flex items-center justify-center ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-red-500 hover:text-red-300'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-red-300 hover:text-red-600'
+                  }`}
+                  title="Limpiar busqueda"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" d="M6 6l12 12M18 6l-12 12"></path>
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Resultados ordenados por relevancia.
+              </p>
+              <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                {publicacionesFiltradas.length} resultado(s)
+              </p>
             </div>
           </div>
 
-          <div className="space-y-12">
+          <div className="space-y-8">
             {publicacionesFiltradas.length === 0 && (
               <article className={`rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border transition-all duration-300 p-6 sm:p-10 text-center ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
                 <h3 className="text-xl sm:text-2xl font-black mb-2">No hay comunicados para mostrar</h3>

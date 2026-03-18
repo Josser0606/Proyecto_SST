@@ -9,6 +9,7 @@ import Admin from './pages/Admin';
 import RegistroEmpleado from './pages/RegistroEmpleado';
 import AdminPanel from './pages/AdminPanel';
 import Reportes from './pages/Reportes';
+import ReportesPanel from './pages/ReportesPanel';
 import { setAuthToken } from './config/api';
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
@@ -193,6 +194,15 @@ function App() {
           element={(
             <ProtectedRoute adminOnly>
               <Reportes />
+            </ProtectedRoute>
+          )}
+        />
+
+        <Route
+          path="/reportes-panel"
+          element={(
+            <ProtectedRoute adminOnly>
+              <ReportesPanel />
             </ProtectedRoute>
           )}
         />
