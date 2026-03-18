@@ -66,6 +66,12 @@ function Dashboard() {
   });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsSeen, setNotificationsSeen] = useState({});
+  const [showResumen, setShowResumen] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
+  ));
+  const [showActividad, setShowActividad] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
+  ));
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState({
@@ -832,85 +838,70 @@ function Dashboard() {
             )}
           </div>
 
-          <section className={`mb-6 rounded-3xl border p-4 sm:p-6 ${
-            darkMode ? 'bg-gradient-to-br from-slate-900 to-slate-900/90 border-slate-800 shadow-2xl shadow-black/20' : 'bg-white border-gray-100 shadow-md shadow-slate-200/60'
-          }`}>
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${darkMode ? 'bg-green-400' : 'bg-green-600'}`}></span>
-                <h2 className={`text-base sm:text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Resumen del Tablero</h2>
-              </div>
-              <span className={`text-[10px] uppercase tracking-[0.18em] font-black px-2 py-1 rounded-full ${
-                darkMode ? 'text-slate-300 bg-slate-800 border border-slate-700' : 'text-slate-500 bg-slate-100 border border-slate-200'
-              }`}>
-                Comunicados
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
-                darkMode ? 'border-slate-700 bg-slate-800/70 hover:border-slate-600' : 'border-slate-200 bg-slate-50/80 hover:bg-white'
-              }`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Total</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
-                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-slate-600' : 'bg-slate-300'}`}></div>
-              </article>
-              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
-                darkMode ? 'border-green-800 bg-green-900/20 hover:border-green-700' : 'border-green-200 bg-green-50/90 hover:bg-green-50'
-              }`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Leidos</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalLeidas}</p>
-                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-green-500/70' : 'bg-green-400'}`}></div>
-              </article>
-              <article className={`rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
-                darkMode ? 'border-amber-800 bg-amber-900/20 hover:border-amber-700' : 'border-amber-200 bg-amber-50/90 hover:bg-amber-50'
-              }`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
-                <div className={`mt-3 h-1 w-14 rounded-full ${darkMode ? 'bg-amber-500/70' : 'bg-amber-400'}`}></div>
-              </article>
-            </div>
-          </section>
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <section className={`rounded-2xl border p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+              <button
+                type="button"
+                onClick={() => setShowResumen((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-2"
+              >
+                <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Resumen
+                </p>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${darkMode ? 'border-slate-700 text-slate-300 bg-slate-800' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
+                  {showResumen ? 'Ocultar' : 'Ver'}
+                </span>
+              </button>
+              {showResumen && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
+                    <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Total</p>
+                    <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
+                  </article>
+                  <article className={`rounded-lg border p-2 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/90'}`}>
+                    <p className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Leidos</p>
+                    <p className={`text-base font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalLeidas}</p>
+                  </article>
+                  <article className={`rounded-lg border p-2 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/90'}`}>
+                    <p className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pend.</p>
+                    <p className={`text-base font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
+                  </article>
+                </div>
+              )}
+            </section>
 
-          <section className={`mb-6 rounded-3xl border p-4 sm:p-6 ${
-            darkMode ? 'bg-gradient-to-br from-slate-900 to-slate-900/90 border-slate-800 shadow-2xl shadow-black/20' : 'bg-white border-gray-100 shadow-md shadow-slate-200/60'
-          }`}>
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${darkMode ? 'bg-sky-400' : 'bg-sky-600'}`}></span>
-                <h2 className={`text-base sm:text-lg font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi actividad</h2>
-              </div>
-              <span className={`text-[10px] uppercase tracking-[0.18em] font-black px-2 py-1 rounded-full ${
-                darkMode ? 'text-slate-300 bg-slate-800 border border-slate-700' : 'text-slate-500 bg-slate-100 border border-slate-200'
-              }`}>
-                Personal
-              </span>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50/80'}`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Leidos</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
-              </article>
-              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50/90'}`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-amber-300' : 'text-amber-700'}`}>Pendientes</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
-              </article>
-              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50/90'}`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-green-300' : 'text-green-700'}`}>Reacciones</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-green-200' : 'text-green-700'}`}>{totalReaccionesPropias}</p>
-              </article>
-              <article className={`rounded-2xl border p-3.5 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/90'}`}>
-                <p className={`text-[10px] uppercase tracking-[0.16em] font-black ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
-                <p className={`mt-1 text-2xl font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
-              </article>
-            </div>
-            <div className={`mt-4 rounded-xl px-3 py-2.5 border text-xs flex items-center gap-2 ${
-              darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'
-            }`}>
-              <FiCheckCircle className={`w-4 h-4 ${darkMode ? 'text-green-300' : 'text-green-700'}`} />
-              <span>Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}</span>
-            </div>
-          </section>
-
+            <section className={`rounded-2xl border p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+              <button
+                type="button"
+                onClick={() => setShowActividad((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-2"
+              >
+                <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Mi actividad
+                </p>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${darkMode ? 'border-slate-700 text-slate-300 bg-slate-800' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
+                  {showActividad ? 'Ocultar' : 'Ver'}
+                </span>
+              </button>
+              {showActividad && (
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
+                      <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Leidos</p>
+                      <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
+                    </article>
+                    <article className={`rounded-lg border p-2 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/90'}`}>
+                      <p className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
+                      <p className={`text-base font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
+                    </article>
+                  </div>
+                  <div className={`rounded-lg border px-2.5 py-2 text-[10px] ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                    Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
           <div className="mb-4 sm:mb-6">
             <div className="relative">
               <input
@@ -1176,7 +1167,6 @@ function Dashboard() {
                 </div>
               </article>
             )})}
-          </div>
           </div>
         </main>
       </div>
