@@ -66,12 +66,7 @@ function Dashboard() {
   });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsSeen, setNotificationsSeen] = useState({});
-  const [showResumen, setShowResumen] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
-  ));
-  const [showActividad, setShowActividad] = useState(() => (
-    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
-  ));
+  const [panelAbierto, setPanelAbierto] = useState(null);
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState({
@@ -184,6 +179,11 @@ function Dashboard() {
     setSidebarCollapsed(next);
     localStorage.setItem('sidebarCollapsed', String(next));
   };
+
+  const showResumen = panelAbierto === 'resumen';
+  const showActividad = panelAbierto === 'actividad';
+  const toggleResumen = () => setPanelAbierto((prev) => (prev === 'resumen' ? null : 'resumen'));
+  const toggleActividad = () => setPanelAbierto((prev) => (prev === 'actividad' ? null : 'actividad'));
 
   const registrarBusqueda = useCallback((value) => {
     const term = String(value || '').trim();
@@ -828,22 +828,33 @@ function Dashboard() {
             )}
           </div>
 
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <section className={`rounded-2xl border p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+            <section className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
               <button
                 type="button"
-                onClick={() => setShowResumen((prev) => !prev)}
-                className="w-full flex items-center justify-between gap-2"
+                onClick={toggleResumen}
+                className="w-full flex items-center justify-between gap-2 px-3 pt-3 pb-2"
+                aria-expanded={showResumen}
               >
                 <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                   Resumen
                 </p>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${darkMode ? 'border-slate-700 text-slate-300 bg-slate-800' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
-                  {showResumen ? 'Ocultar' : 'Ver'}
+                <span
+                  className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-transform duration-300 ${
+                    darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'
+                  } ${showResumen ? 'rotate-180' : 'rotate-0'}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" d="M6 9l6 6 6-6"></path>
+                  </svg>
                 </span>
               </button>
-              {showResumen && (
-                <div className="mt-3 grid grid-cols-3 gap-2">
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${
+                  showResumen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
+                <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-1">
                   <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Total</p>
                     <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
@@ -857,24 +868,35 @@ function Dashboard() {
                     <p className={`text-base font-black ${darkMode ? 'text-amber-200' : 'text-amber-700'}`}>{totalPendientes}</p>
                   </article>
                 </div>
-              )}
+              </div>
             </section>
 
-            <section className={`rounded-2xl border p-3 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
+            <section className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
               <button
                 type="button"
-                onClick={() => setShowActividad((prev) => !prev)}
-                className="w-full flex items-center justify-between gap-2"
+                onClick={toggleActividad}
+                className="w-full flex items-center justify-between gap-2 px-3 pt-3 pb-2"
+                aria-expanded={showActividad}
               >
                 <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                   Mi actividad
                 </p>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-black ${darkMode ? 'border-slate-700 text-slate-300 bg-slate-800' : 'border-slate-200 text-slate-500 bg-slate-50'}`}>
-                  {showActividad ? 'Ocultar' : 'Ver'}
+                <span
+                  className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-transform duration-300 ${
+                    darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-500'
+                  } ${showActividad ? 'rotate-180' : 'rotate-0'}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" d="M6 9l6 6 6-6"></path>
+                  </svg>
                 </span>
               </button>
-              {showActividad && (
-                <div className="mt-3 space-y-2">
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-out ${
+                  showActividad ? 'max-h-56 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
+                <div className="space-y-2 px-3 pb-3 pt-1">
                   <div className="grid grid-cols-2 gap-2">
                     <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Leidos</p>
@@ -889,7 +911,7 @@ function Dashboard() {
                     Ultima lectura: {ultimaLectura ? ultimaLectura.toLocaleString() : 'Sin registros recientes'}
                   </div>
                 </div>
-              )}
+              </div>
             </section>
           </div>
           <div className="mb-4 sm:mb-6">
