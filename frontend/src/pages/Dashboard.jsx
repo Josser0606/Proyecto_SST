@@ -50,13 +50,13 @@ function Dashboard() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [searchScopes, setSearchScopes] = useState({
+  const [searchScopes] = useState({
     titulo: true,
     contenido: true,
     categoria: true,
     recursos: true
   });
-  const [searchHistory, setSearchHistory] = useState(() => {
+  const [, setSearchHistory] = useState(() => {
     try {
       const parsed = JSON.parse(localStorage.getItem(SEARCH_KEY_DASHBOARD) || '[]');
       return Array.isArray(parsed) ? parsed : [];
@@ -392,15 +392,6 @@ function Dashboard() {
     return filtered;
   }, [publicaciones, categoriaFiltro, busqueda, searchScopes]);
 
-  const sugerenciasBusqueda = useMemo(() => {
-    const term = normalizarTexto(busqueda);
-    const pool = [...searchHistory, ...DASHBOARD_SUGERENCIAS_BASE];
-    const unique = Array.from(new Map(pool.map((item) => [normalizarTexto(item), item])).values());
-    return unique
-      .filter((item) => !term || normalizarTexto(item).includes(term))
-      .slice(0, 6);
-  }, [searchHistory, busqueda]);
-
   const highlightText = useCallback((text) => {
     const raw = String(text || '');
     const query = String(busqueda || '').trim();
@@ -424,7 +415,6 @@ function Dashboard() {
   const totalPublicaciones = publicaciones.length;
   const totalLeidas = publicaciones.filter((p) => Number(p.leido) > 0).length;
   const totalPendientes = Math.max(totalPublicaciones - totalLeidas, 0);
-  const totalReaccionesPropias = publicaciones.filter((p) => Boolean(p.reaccion_usuario)).length;
   const totalPendientesReconfirmar = publicaciones.filter((p) => Number(p.requiere_reconfirmacion) > 0 && Number(p.puede_confirmar_lectura) > 0 && Number(p.leido) === 0).length;
   const ultimaLectura = publicaciones
     .filter((p) => Number(p.leido) > 0 && p.fecha_lectura)
@@ -1167,6 +1157,7 @@ function Dashboard() {
                 </div>
               </article>
             )})}
+          </div>
           </div>
         </main>
       </div>
