@@ -35,6 +35,7 @@ function RegistroEmpleado() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const formRef = useRef(null);
+  const formSnapshotRef = useRef(BASE_FORM);
   const navigate = useNavigate();
 
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
@@ -56,6 +57,29 @@ function RegistroEmpleado() {
     };
   }, [formOpen]);
 
+  const tieneCambiosFormulario = useMemo(() => {
+    if (!formOpen) return false;
+    const snap = formSnapshotRef.current || BASE_FORM;
+    return (
+      formData.nombre_completo !== (snap.nombre_completo || '') ||
+      formData.area !== (snap.area || 'SST y GH') ||
+      formData.rol !== (snap.rol || 'empleado') ||
+      formData.password !== (snap.password || '') ||
+      formData.email !== (snap.email || '') ||
+      Boolean(formData.notificar_email) !== Boolean(snap.notificar_email)
+    );
+  }, [formData, formOpen]);
+
+  useEffect(() => {
+    if (!tieneCambiosFormulario || loading) return undefined;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [tieneCambiosFormulario, loading]);
+
   const cargarUsuarios = async () => {
     try {
       const { data } = await axios.get(apiUrl('/api/usuarios'));
@@ -68,6 +92,7 @@ function RegistroEmpleado() {
   const limpiarFormulario = () => {
     setFormData(BASE_FORM);
     setEditandoId(null);
+    formSnapshotRef.current = BASE_FORM;
   };
 
   const cerrarFormulario = () => {
@@ -132,17 +157,19 @@ function RegistroEmpleado() {
   };
 
   const editarUsuario = (usuario) => {
-    setFormOpen(true);
-    setEditandoId(usuario.id);
-    toast('Editando empleado');
-    setFormData({
-      nombre_completo: usuario.nombre_completo,
-      area: usuario.area,
-      rol: usuario.rol,
+    const snapshot = {
+      nombre_completo: usuario.nombre_completo || '',
+      area: usuario.area || 'SST y GH',
+      rol: usuario.rol || 'empleado',
       password: '',
       email: usuario.email || '',
       notificar_email: Boolean(usuario.notificar_email)
-    });
+    };
+    formSnapshotRef.current = snapshot;
+    setFormOpen(true);
+    setEditandoId(usuario.id);
+    toast('Editando empleado');
+    setFormData(snapshot);
   };
 
   const confirmarAccion = (mensaje) => new Promise((resolve) => {
@@ -618,6 +645,7 @@ function RegistroEmpleado() {
                         return;
                       }
                       limpiarFormulario();
+                      formSnapshotRef.current = BASE_FORM;
                       setFormOpen(true);
                     }}
                     className={`px-4 sm:px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-sm ${
@@ -663,9 +691,9 @@ function RegistroEmpleado() {
                         {u.rol}
                       </span>
                       <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                        Boolean(u.notificar_email) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        u.notificar_email ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
                       }`}>
-                        {Boolean(u.notificar_email) ? 'Email on' : 'Email off'}
+                        {u.notificar_email ? 'Email on' : 'Email off'}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -744,9 +772,9 @@ function RegistroEmpleado() {
                         </span>
                         <div className="mt-1">
                           <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                            Boolean(u.notificar_email) ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                            u.notificar_email ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
                           }`}>
-                            {Boolean(u.notificar_email) ? 'Email on' : 'Email off'}
+                            {u.notificar_email ? 'Email on' : 'Email off'}
                           </span>
                         </div>
                       </div>

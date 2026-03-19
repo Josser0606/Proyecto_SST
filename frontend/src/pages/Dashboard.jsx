@@ -89,6 +89,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const cargandoPublicacionesRef = useRef(false);
   const notificationPanelRef = useRef(null);
+  const editSnapshotRef = useRef(null);
   const REACCIONES_DISPONIBLES = [
     { key: 'util', label: 'Util', icon: FiThumbsUp },
     { key: 'importante', label: 'Importante', icon: FiZap },
@@ -180,6 +181,39 @@ function Dashboard() {
     localStorage.setItem('sidebarCollapsed', String(next));
   };
 
+  const tieneCambiosEdicion = useMemo(() => {
+    if (!editandoId) return false;
+    const snap = editSnapshotRef.current;
+    if (!snap) return false;
+    const normalizeLinks = (arr = []) => arr.map((l) => String(l || '').trim()).filter(Boolean);
+    const currentLinks = normalizeLinks(formEdit.linksNuevos);
+    const snapLinks = normalizeLinks(snap.linksNuevos);
+    const linksEqual = currentLinks.length === snapLinks.length && currentLinks.every((v, i) => v === snapLinks[i]);
+    const currentRecursos = [...(formEdit.recursosExistentes || [])].map((r) => Number(r.id)).sort((a, b) => a - b);
+    const snapRecursos = [...(snap.recursosExistentes || [])].map((id) => Number(id)).sort((a, b) => a - b);
+    const recursosEqual = currentRecursos.length === snapRecursos.length && currentRecursos.every((v, i) => v === snapRecursos[i]);
+
+    return (
+      String(formEdit.titulo || '').trim() !== String(snap.titulo || '').trim() ||
+      String(formEdit.contenido || '').trim() !== String(snap.contenido || '').trim() ||
+      String(formEdit.categoria || '') !== String(snap.categoria || '') ||
+      Boolean(formEdit.imagenNueva) ||
+      (formEdit.archivosNuevos || []).length > 0 ||
+      !recursosEqual ||
+      !linksEqual
+    );
+  }, [editandoId, formEdit]);
+
+  useEffect(() => {
+    if (!tieneCambiosEdicion) return undefined;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [tieneCambiosEdicion]);
+
   const showResumen = panelAbierto === 'resumen';
   const showActividad = panelAbierto === 'actividad';
   const toggleResumen = () => setPanelAbierto((prev) => (prev === 'resumen' ? null : 'resumen'));
@@ -264,6 +298,14 @@ function Dashboard() {
   };
 
   const activarEdicion = (pub) => {
+    const recursosBase = (pub.recursos || []).map((r) => ({ id: r.id, tipo: r.tipo, nombre: r.nombre, url: r.url }));
+    editSnapshotRef.current = {
+      titulo: pub.titulo || '',
+      contenido: pub.contenido || '',
+      categoria: pub.categoria || 'SST y GH',
+      recursosExistentes: recursosBase.map((r) => r.id),
+      linksNuevos: []
+    };
     setEditandoId(pub.id);
     toast('Modo edicion activado');
     setFormEdit({
@@ -272,7 +314,7 @@ function Dashboard() {
       categoria: pub.categoria || 'SST y GH',
       imagenNueva: null,
       archivosNuevos: [],
-      recursosExistentes: (pub.recursos || []).map((r) => ({ id: r.id, tipo: r.tipo, nombre: r.nombre, url: r.url })),
+      recursosExistentes: recursosBase,
       linksNuevos: ['']
     });
   };
@@ -336,6 +378,7 @@ function Dashboard() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       toast.success('Publicacion actualizada');
+      editSnapshotRef.current = null;
       setEditandoId(null);
       cargarPublicaciones();
     } catch {
@@ -1042,7 +1085,7 @@ function Dashboard() {
 
                       <div>
                         <button onClick={() => guardarEdicion(pub.id)} className="bg-green-600 text-white px-6 py-2 rounded-xl text-xs font-bold">Guardar</button>
-                        <button onClick={() => setEditandoId(null)} className="ml-4 text-xs font-bold opacity-50">Cancelar</button>
+                        <button onClick={() => { editSnapshotRef.current = null; setEditandoId(null); }} className="ml-4 text-xs font-bold opacity-50">Cancelar</button>
                       </div>
                     </div>
                   ) : (

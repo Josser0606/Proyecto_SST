@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBarChart2, FiCheckCircle, FiFile, FiFileText, FiImage, FiLink2, FiMapPin, FiMonitor, FiPaperclip, FiRefreshCw, FiType, FiUpload, FiX } from 'react-icons/fi';
+import { FiBarChart2, FiCheckCircle, FiEye, FiFile, FiFileText, FiHeart, FiImage, FiLink2, FiMapPin, FiMonitor, FiPaperclip, FiRefreshCw, FiThumbsUp, FiType, FiUpload, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 
@@ -69,8 +69,8 @@ function AdminPanel() {
   const [archivosInputs, setArchivosInputs] = useState([null]);
   const [links, setLinks] = useState(['']);
   const [loading, setLoading] = useState(false);
-  const [portadaPreviewUrl, setPortadaPreviewUrl] = useState('');
-  const [imagenesPreviewUrls, setImagenesPreviewUrls] = useState([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImageUrls, setPreviewImageUrls] = useState([]);
   const [draggingImagenes, setDraggingImagenes] = useState(false);
   const [draggingArchivos, setDraggingArchivos] = useState(false);
   const [tituloSeed, setTituloSeed] = useState(0);
@@ -79,6 +79,16 @@ function AdminPanel() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const navigate = useNavigate();
   const usuario = JSON.parse(localStorage.getItem('usuario'));
+  const tieneCambiosSinGuardar = useMemo(() => {
+    return Boolean(
+      titulo.trim() ||
+      contenido.trim() ||
+      categoria !== 'SST y GH' ||
+      imagenesInputs.some(Boolean) ||
+      archivosInputs.some(Boolean) ||
+      links.some((link) => link.trim())
+    );
+  }, [titulo, contenido, categoria, imagenesInputs, archivosInputs, links]);
   const toggleDarkMode = () => {
     const next = !darkMode;
     setDarkMode(next);
@@ -123,6 +133,9 @@ function AdminPanel() {
   const imagenesSeleccionadas = imagenesInputs.filter(Boolean).length;
   const archivosSeleccionados = archivosInputs.filter(Boolean).length;
   const linksActivos = links.map((l) => l.trim()).filter(Boolean).length;
+  const imagenesSeleccionadasList = useMemo(() => imagenesInputs.filter(Boolean), [imagenesInputs]);
+  const archivosSeleccionadosList = useMemo(() => archivosInputs.filter(Boolean), [archivosInputs]);
+  const linksPreview = useMemo(() => links.map((l) => l.trim()).filter(Boolean), [links]);
   const caracteresContenido = contenido.trim().length;
   const tituloSugerencias = useMemo(() => {
     const value = titulo.trim();
@@ -147,6 +160,7 @@ function AdminPanel() {
     const mixed = [...context, ...relatedBase, ...randomBase];
     return [...new Set(mixed)].filter(Boolean).slice(0, 6);
   }, [titulo, categoria, tituloSeed]);
+  const mostrarSugerenciasTitulo = titulo.trim().length < 8;
   const getDisplayName = (fileName) => {
     if (!fileName) return 'Ningun archivo seleccionado';
     return fileName.length > 42 ? `${fileName.slice(0, 39)}...` : fileName;
@@ -213,26 +227,33 @@ function AdminPanel() {
   };
 
   useEffect(() => {
-    const portada = imagenesInputs.find(Boolean);
-    if (!portada) {
-      setPortadaPreviewUrl('');
-      return undefined;
-    }
-    const localUrl = URL.createObjectURL(portada);
-    setPortadaPreviewUrl(localUrl);
-    return () => URL.revokeObjectURL(localUrl);
-  }, [imagenesInputs]);
+    if (!tieneCambiosSinGuardar || loading) return undefined;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [tieneCambiosSinGuardar, loading]);
 
   useEffect(() => {
-    const seleccionadas = imagenesInputs.filter(Boolean);
-    if (seleccionadas.length === 0) {
-      setImagenesPreviewUrls([]);
+    if (!previewOpen) {
+      setPreviewImageUrls([]);
       return undefined;
     }
-    const urls = seleccionadas.map((file) => URL.createObjectURL(file));
-    setImagenesPreviewUrls(urls);
+    const urls = imagenesSeleccionadasList.map((file) => URL.createObjectURL(file));
+    setPreviewImageUrls(urls);
     return () => urls.forEach((url) => URL.revokeObjectURL(url));
-  }, [imagenesInputs]);
+  }, [previewOpen, imagenesSeleccionadasList]);
+
+  useEffect(() => {
+    if (!previewOpen) return undefined;
+    const onEsc = (event) => {
+      if (event.key === 'Escape') setPreviewOpen(false);
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [previewOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -488,7 +509,12 @@ function AdminPanel() {
                 <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
                 <div className={`rounded-2xl border p-3 space-y-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
                   <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                  {!titulo.trim() && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-out ${
+                      mostrarSugerenciasTitulo ? 'max-h-72 opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-1 pointer-events-none'
+                    }`}
+                    aria-hidden={!mostrarSugerenciasTitulo}
+                  >
                     <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <p className={`text-[10px] uppercase font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sugerencias de titulo</p>
@@ -524,7 +550,7 @@ function AdminPanel() {
                         ))}
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
               <div className="space-y-2 lg:col-span-4">
@@ -561,13 +587,7 @@ function AdminPanel() {
                 </button>
               </div>
               <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-              <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
-              {portadaPreviewUrl && (
-                <div className={`rounded-xl border p-2 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Vista previa portada</p>
-                  <img src={portadaPreviewUrl} alt="Portada" className="w-full h-40 object-cover rounded-lg" />
-                </div>
-              )}
+              <div className={`rounded-2xl border p-4 space-y-3 max-h-[360px] overflow-auto modal-scroll ${darkMode ? 'modal-scroll-dark border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div
                 onDragOver={(e) => {
                   handleDragOver(e);
@@ -623,36 +643,6 @@ function AdminPanel() {
               <p className={`text-xs font-bold ${imagenesInputs.filter(Boolean).length > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                 {imagenesInputs.filter(Boolean).length > 0 ? `${imagenesInputs.filter(Boolean).length} imagen(es) agregada(s)` : 'No hay imagenes agregadas'}
               </p>
-              {imagenesPreviewUrls.length > 0 && (
-                <div className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-900/80' : 'border-gray-200 bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Miniaturas</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {imagenesPreviewUrls.map((url, idx) => (
-                      <div key={`${url}-${idx}`} className="relative rounded-lg overflow-hidden border border-slate-200">
-                        <img src={url} alt={`Imagen ${idx + 1}`} className="w-full h-20 object-cover" />
-                        {idx === 0 && (
-                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-600 text-white text-[9px] font-black uppercase tracking-wide">
-                            Portada
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {imagenesInputs.filter(Boolean).length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {imagenesInputs.filter(Boolean).map((f, i) => (
-                    <div key={`${f.name}-${i}`} className={`rounded-lg border px-2.5 py-2 text-xs ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-700'}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold truncate">{getDisplayName(f.name)}</span>
-                        {i === 0 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-600 text-white font-black">PORTADA</span>}
-                      </div>
-                      <div className={`mt-1 text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{formatFileSize(f.size)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
               </div>
             </div>
 
@@ -676,7 +666,7 @@ function AdminPanel() {
                 </button>
               </div>
               <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-              <div className={`rounded-2xl border p-4 space-y-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
+              <div className={`rounded-2xl border p-4 space-y-3 max-h-[420px] overflow-auto modal-scroll ${darkMode ? 'modal-scroll-dark border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
               <div
                 onDragOver={(e) => {
                   handleDragOver(e);
@@ -819,12 +809,162 @@ function AdminPanel() {
 
             <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t lg:col-span-12 ${darkMode ? 'border-slate-800' : 'border-gray-50'}`}>
               <p className="text-[11px] text-slate-400 font-medium">Revisa que todo este correcto antes de publicar.</p>
-              <button type="submit" disabled={loading} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-8 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[11px]">
-                {loading ? 'Guardando...' : 'Publicar'}
-              </button>
+              <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(true)}
+                  className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[11px] border transition ${
+                    darkMode
+                      ? 'border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700'
+                      : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <FiEye className="w-4 h-4" />
+                  Vista previa
+                </button>
+                <button type="submit" disabled={loading} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-8 py-2.5 rounded-lg font-bold uppercase tracking-widest text-[11px]">
+                  {loading ? 'Guardando...' : 'Publicar'}
+                </button>
+              </div>
             </div>
           </div>
         </form>
+
+        {previewOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-[85] bg-slate-900/55 backdrop-blur-[1px]"
+              onClick={() => setPreviewOpen(false)}
+            ></div>
+            <section className={`modal-scroll fixed left-1/2 top-1/2 z-[95] w-[94vw] max-w-5xl -translate-x-1/2 -translate-y-1/2 rounded-[1.2rem] border shadow-2xl p-4 sm:p-6 max-h-[88vh] overflow-y-auto ${
+              darkMode ? 'modal-scroll-dark bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-gray-200 text-slate-800'
+            }`}>
+              <div className={`flex items-center justify-between pb-3 border-b ${darkMode ? 'border-slate-700' : 'border-gray-200'}`}>
+                <div>
+                  <p className={`text-[10px] uppercase tracking-[0.2em] font-black ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Vista previa</p>
+                  <h3 className="text-lg font-black">Asi se vera el comunicado</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(false)}
+                  className={`w-8 h-8 rounded-full border flex items-center justify-center transition ${
+                    darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-gray-300 text-slate-600 hover:bg-gray-100'
+                  }`}
+                  title="Cerrar vista previa"
+                >
+                  <FiX />
+                </button>
+              </div>
+
+              <article className={`mt-4 rounded-[2.2rem] overflow-hidden border transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
+                {previewImageUrls[0] && (
+                  <div className={`w-full flex justify-center p-4 sm:p-8 border-b ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-gray-50'}`}>
+                    <img src={previewImageUrls[0]} alt="Portada previa" className="max-w-full h-auto max-h-[85vh] rounded-2xl shadow-2xl object-contain" />
+                  </div>
+                )}
+                <div className="p-5 sm:p-8 lg:p-10 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
+                    <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-lg ${
+                      darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'
+                    }`}>
+                      {categoria}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-bold">{new Date().toLocaleDateString()}</span>
+                  </div>
+                  <h4 className="text-2xl font-black break-words [overflow-wrap:anywhere]">{titulo.trim() || 'Titulo del comunicado'}</h4>
+                  <p className={`text-base leading-relaxed whitespace-pre-line break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {contenido.trim() || 'Aqui se mostrara el contenido del comunicado cuando escribas el mensaje.'}
+                  </p>
+
+                  {previewImageUrls.length > 1 && (
+                    <div className={`mb-2 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Galeria de imagenes</p>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {previewImageUrls.slice(1).map((url, idx) => (
+                          <img key={`${url}-${idx}`} src={url} alt={`Imagen ${idx + 2}`} className="w-full h-36 object-cover rounded-xl border border-slate-200" />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(archivosSeleccionadosList.length > 0 || linksPreview.length > 0) && (
+                    <div className={`mb-2 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                      <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Recursos adjuntos</p>
+                      <div className="flex flex-wrap gap-2">
+                        {archivosSeleccionadosList.map((file, idx) => (
+                          <span key={`${file.name}-${idx}`} className={`inline-flex px-3 py-1.5 rounded-xl text-xs font-bold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+                            Archivo: {getDisplayName(file.name)}
+                          </span>
+                        ))}
+                        {linksPreview.map((link, idx) => (
+                          <span key={`${link}-${idx}`} className={`inline-flex px-3 py-1.5 rounded-xl text-xs font-bold border ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+                            Link: {link}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`mb-2 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Reacciones</p>
+                      <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Vista de interacciones</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black border ${
+                        darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
+                      }`}>
+                        <FiThumbsUp className="w-3.5 h-3.5" />
+                        Util
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          0
+                        </span>
+                      </span>
+                      <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black border ${
+                        darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
+                      }`}>
+                        <FiZap className="w-3.5 h-3.5" />
+                        Importante
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          0
+                        </span>
+                      </span>
+                      <span className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-black border ${
+                        darkMode ? 'bg-slate-900 text-slate-300 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
+                      }`}>
+                        <FiHeart className="w-3.5 h-3.5" />
+                        Me gusta
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                          darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          0
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-6 border-t ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
+                    <button
+                      type="button"
+                      className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-400'
+                      }`}
+                    >
+                      Confirmar lectura
+                    </button>
+                    <p className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Vista previa del comunicado completo
+                    </p>
+                  </div>
+                </div>
+              </article>
+            </section>
+          </>
+        )}
         </div>
       </main>
       </div>
