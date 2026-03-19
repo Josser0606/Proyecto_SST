@@ -488,41 +488,43 @@ function AdminPanel() {
                 <div className={`h-px ${darkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
                 <div className={`rounded-2xl border p-3 space-y-2.5 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-gray-200 bg-slate-50/60'}`}>
                   <input type="text" placeholder="Informacion Saciar" required className={`w-full px-4 py-3 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200'}`} value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-                  <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <p className={`text-[10px] uppercase font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sugerencias de titulo</p>
-                    <button
-                      type="button"
-                      onClick={refreshTituloSuggestions}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-black transition ${
-                        darkMode
-                          ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-green-500 hover:text-green-300'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
-                      }`}
-                      title="Generar nuevas sugerencias"
-                    >
-                      <FiRefreshCw className={`w-3 h-3 ${refreshingTitulos ? 'animate-spin' : ''}`} />
-                      Nuevas
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {tituloSugerencias.map((sugerencia, idx) => (
-                      <button
-                        key={`${sugerencia}-${idx}`}
-                        type="button"
-                        onClick={() => setTitulo(sugerencia)}
-                        className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
-                          darkMode
-                            ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300'
-                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-green-300 hover:text-green-700'
-                        }`}
-                        title="Usar este titulo"
-                      >
-                        {sugerencia}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                  {!titulo.trim() && (
+                    <div className={`rounded-xl border p-2.5 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <p className={`text-[10px] uppercase font-black tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Sugerencias de titulo</p>
+                        <button
+                          type="button"
+                          onClick={refreshTituloSuggestions}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[10px] font-black transition ${
+                            darkMode
+                              ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-green-500 hover:text-green-300'
+                              : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-green-300 hover:text-green-700'
+                          }`}
+                          title="Generar nuevas sugerencias"
+                        >
+                          <FiRefreshCw className={`w-3 h-3 ${refreshingTitulos ? 'animate-spin' : ''}`} />
+                          Nuevas
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {tituloSugerencias.map((sugerencia, idx) => (
+                          <button
+                            key={`${sugerencia}-${idx}`}
+                            type="button"
+                            onClick={() => setTitulo(sugerencia)}
+                            className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition cursor-pointer ${
+                              darkMode
+                                ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300'
+                                : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-green-300 hover:text-green-700'
+                            }`}
+                            title="Usar este titulo"
+                          >
+                            {sugerencia}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2 lg:col-span-4">
