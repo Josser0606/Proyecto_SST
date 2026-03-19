@@ -99,6 +99,13 @@ function Reportes() {
     return `${total} total · U:${util} I:${importante} MG:${meGusta}`;
   };
 
+  const desglosarReacciones = (reg) => ({
+    total: Number(reg.total_reacciones || 0),
+    util: Number(reg.reaccion_util || 0),
+    importante: Number(reg.reaccion_importante || 0),
+    meGusta: Number(reg.reaccion_me_gusta || 0)
+  });
+
   const registrarBusqueda = (value) => {
     const term = String(value || '').trim();
     if (!term) return;
@@ -760,13 +767,15 @@ function Reportes() {
           </button>
         </div>
 
-        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-4 sm:mb-6 gap-4 sm:gap-5">
+        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-3 sm:mb-5 gap-4 sm:gap-5">
           <div className="min-w-0">
             <h1 className={`text-2xl sm:text-4xl 2xl:text-[2.8rem] leading-[1] font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>Auditoria de Lectura</h1>
             <p className={`${darkMode ? 'text-slate-400' : 'text-gray-500'} font-medium`}>Historico de lecturas por cominicado</p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px]">
+          <div className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px] rounded-2xl border p-3 ${
+            darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-gray-200 bg-white/90'
+          }`}>
             <div className="relative w-full min-w-0">
               <svg className={`w-5 h-5 absolute left-3 top-3 ${darkMode ? 'text-slate-500' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -817,7 +826,7 @@ function Reportes() {
             <button
               onClick={exportarInformacion}
               disabled={datosFiltrados.length === 0}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-6 py-3 rounded-2xl font-bold shadow-lg  flex items-center justify-center gap-2 transition-all active:scale-95"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-6 py-3 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -827,19 +836,22 @@ function Reportes() {
           </div>
         </div>
 
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             Busqueda inteligente por empleado, comunicado, area, categoria y tipo.
           </p>
-          <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide border ${
+            darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-gray-200 bg-white text-slate-600'
+          }`}>
             {datosFiltrados.length} resultado(s)
-          </p>
+          </span>
         </div>
         <div className={`rounded-[1.5rem] sm:rounded-[2.5rem] shadow-xl border overflow-hidden ${
           darkMode ? 'bg-slate-900 border-slate-800 shadow-black/30' : 'bg-white border-gray-100 shadow-slate-200/60'
         }`}>
           <div className={`px-4 sm:px-6 pt-4 pb-3 border-b ${darkMode ? 'border-slate-800 bg-slate-900/70' : 'border-gray-100 bg-white'}`}>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setVistaAuditoria('categorias')}
@@ -866,6 +878,7 @@ function Reportes() {
               >
                 Vista general
               </button>
+              </div>
               <span className={`text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 {datosFiltrados.length} registro(s) en {datosAgrupadosPorCategoria.length} categoria(s)
               </span>
@@ -933,10 +946,13 @@ function Reportes() {
                                 <button
                                   type="button"
                                   onClick={() => eliminarReporte(reg.id)}
-                                  className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                                    darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border transition ${
+                                    darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                                   }`}
                                 >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 7h12M9 7V5h6v2m-7 3v8m4-8v8m4-8v8M8 7h8l-1 13H9L8 7z"></path>
+                                  </svg>
                                   Eliminar
                                 </button>
                               </div>
@@ -982,10 +998,13 @@ function Reportes() {
                         <button
                           type="button"
                           onClick={() => eliminarReporte(reg.id)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
-                            darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border transition ${
+                            darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                           }`}
                         >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 7h12M9 7V5h6v2m-7 3v8m4-8v8m4-8v8M8 7h8l-1 13H9L8 7z"></path>
+                          </svg>
                           Eliminar
                         </button>
                       </div>
@@ -1036,57 +1055,83 @@ function Reportes() {
                       </button>
 
                       {categoriasAbiertas[grupo.categoria] && (
+                        <div className={`overflow-auto max-h-[60vh] xl:max-h-[66vh] 2xl:max-h-[72vh] sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
                         <table className="w-full text-left">
                           <thead>
                             <tr className={darkMode ? 'bg-green-700/90 text-white' : 'bg-green-600 text-white'}>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Comunicado</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Empleado</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Area</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Tipo</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Reacciones</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Fecha de Confirmacion</th>
+                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Acciones</th>
                             </tr>
                           </thead>
                           <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
                             {grupo.registros.map((reg, index) => (
                               <tr key={`${grupo.categoria}-${index}`} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                                <td className="px-6 py-4">
-                                  <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                                <td className="px-6 py-3.5">
+                                  <p className={`font-bold text-sm leading-tight max-w-[320px] truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
+                                    {highlightText(reg.publicacion)}
+                                  </p>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
-                                  <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                                <td className="px-6 py-3.5">
+                                  <p className={`font-bold max-w-[220px] truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
+                                    {highlightText(reg.empleado || 'Nombre no registrado')}
+                                  </p>
                                 </td>
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-2">
-                                    <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                                      darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                    }`}>
-                                      {highlightText(reg.area)}
-                                    </span>
-                                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                      reg.tipo_confirmacion === 'reconfirmacion'
-                                        ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                                        : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                                    }`}>
-                                      {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
-                                    </span>
-                                  </div>
+                                <td className="px-6 py-3.5">
+                                  <span className={`inline-flex px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                                    darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                                  }`}>
+                                    {highlightText(reg.area)}
+                                  </span>
                                 </td>
-                                <td className={`px-6 py-4 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                                  {resumenReaccionesTexto(reg)}
+                                <td className="px-6 py-3.5">
+                                  <span className={`inline-flex px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                                    reg.tipo_confirmacion === 'reconfirmacion'
+                                      ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                      : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                  }`}>
+                                    {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                                  </span>
                                 </td>
-                                <td className={`px-6 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <td className="px-6 py-3.5">
+                                  {(() => {
+                                    const rx = desglosarReacciones(reg);
+                                    return (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
+                                          Total {rx.total}
+                                        </span>
+                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-emerald-900/30 border-emerald-700 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                                          U {rx.util}
+                                        </span>
+                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-amber-900/30 border-amber-700 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                                          I {rx.importante}
+                                        </span>
+                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-sky-900/30 border-sky-700 text-sky-200' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+                                          MG {rx.meGusta}
+                                        </span>
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                                <td className={`px-6 py-3.5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                   {formatearFechaLectura(reg.fecha_lectura)}
                                 </td>
-                                <td className="px-6 py-4 text-right">
+                                <td className="px-6 py-3.5 text-right">
                                   <button
                                     type="button"
                                     onClick={() => eliminarReporte(reg.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
-                                      darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition ${
+                                      darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                                     }`}
                                   >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 7h12M9 7V5h6v2m-7 3v8m4-8v8m4-8v8M8 7h8l-1 13H9L8 7z"></path>
+                                    </svg>
                                     Eliminar
                                   </button>
                                 </td>
@@ -1094,62 +1139,89 @@ function Reportes() {
                             ))}
                           </tbody>
                         </table>
+                        </div>
                       )}
                     </section>
                   ))}
                 </div>
               ) : (
+                <div className={`overflow-auto max-h-[64vh] xl:max-h-[70vh] 2xl:max-h-[76vh] sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
                 <table className="w-full text-left">
                   <thead>
                     <tr className={darkMode ? 'bg-green-700 text-white' : 'bg-green-600 text-white'}>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Comunicado</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Empleado</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Area</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em]">Reacciones</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Fecha de Confirmacion</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-right">Acciones</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Comunicado</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Empleado</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Area</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Tipo</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Reacciones</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Fecha de Confirmacion</th>
+                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Acciones</th>
                     </tr>
                   </thead>
                   <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
                     {datosFiltrados.map((reg, index) => (
                       <tr key={index} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                        <td className="px-8 py-5">
-                          <p className={`font-bold text-sm leading-tight ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{highlightText(reg.publicacion)}</p>
+                        <td className="px-8 py-4">
+                          <p className={`font-bold text-sm leading-tight max-w-[360px] truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
+                            {highlightText(reg.publicacion)}
+                          </p>
                         </td>
-                        <td className="px-8 py-5">
-                          <p className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>{highlightText(reg.empleado || 'Nombre no registrado')}</p>
-                          <p className={`text-[10px] font-black uppercase tracking-tighter ${darkMode ? 'text-slate-500' : 'text-gray-400'}`}>ID registro: SAC-{(reg.id || index) + 100}</p>
+                        <td className="px-8 py-4">
+                          <p className={`font-bold max-w-[240px] truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
+                            {highlightText(reg.empleado || 'Nombre no registrado')}
+                          </p>
                         </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                              darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}>
-                              {highlightText(reg.area)}
-                            </span>
-                            <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                              reg.tipo_confirmacion === 'reconfirmacion'
-                                ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
-                                : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
-                            }`}>
-                              {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
-                            </span>
-                          </div>
+                        <td className="px-8 py-4">
+                          <span className={`inline-flex px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
+                            darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {highlightText(reg.area)}
+                          </span>
                         </td>
-                        <td className={`px-8 py-5 text-xs font-semibold ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                          {resumenReaccionesTexto(reg)}
+                        <td className="px-8 py-4">
+                          <span className={`inline-flex px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
+                            reg.tipo_confirmacion === 'reconfirmacion'
+                              ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                              : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                          }`}>
+                            {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                          </span>
                         </td>
-                        <td className={`px-8 py-5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <td className="px-8 py-4">
+                          {(() => {
+                            const rx = desglosarReacciones(reg);
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
+                                  Total {rx.total}
+                                </span>
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-emerald-900/30 border-emerald-700 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                                  U {rx.util}
+                                </span>
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-amber-900/30 border-amber-700 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                                  I {rx.importante}
+                                </span>
+                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-sky-900/30 border-sky-700 text-sky-200' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
+                                  MG {rx.meGusta}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </td>
+                        <td className={`px-8 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                           {formatearFechaLectura(reg.fecha_lectura)}
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-8 py-4 text-right">
                           <button
                             type="button"
                             onClick={() => eliminarReporte(reg.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${
-                              darkMode ? 'border-red-800 bg-slate-900 text-red-300' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition ${
+                              darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                             }`}
                           >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M6 7h12M9 7V5h6v2m-7 3v8m4-8v8m4-8v8M8 7h8l-1 13H9L8 7z"></path>
+                            </svg>
                             Eliminar
                           </button>
                         </td>
@@ -1157,6 +1229,7 @@ function Reportes() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )
             ) : (
               <div className="py-24 text-center">
@@ -1173,5 +1246,6 @@ function Reportes() {
 }
 
 export default Reportes;
+
 
 

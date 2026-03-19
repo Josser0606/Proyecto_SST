@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+html {
+  scrollbar-gutter: stable;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
 button,
 a,
 summary,
