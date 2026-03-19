@@ -1110,7 +1110,7 @@ function Dashboard() {
             <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-start gap-2 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
               <FiClock className={`w-4 h-4 mt-0.5 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`} />
               <div className="text-sm">
-                <p className={`font-black ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>Recordatorio amable</p>
+                <p className={`font-black ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>Recordatorio confirmación</p>
                 <p className={`${darkMode ? 'text-amber-100/90' : 'text-amber-700'}`}>
                   Tienes {totalPendientes} pendiente(s) y {totalPendientesReconfirmar} por reconfirmar.
                 </p>

@@ -330,7 +330,7 @@ function ReportesPanel() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2">
+            <div className="flex-1 flex flex-col items-center justify-start pt-1 gap-2">
               <button onClick={() => navigate('/dashboard')} className={`w-10 h-10 rounded-xl border transition flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-900/40 text-slate-200 hover:bg-slate-800 hover:text-white' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`} title="Inicio">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 10.5L12 3l9 7.5M5 9.5V21h5v-6h4v6h5V9.5"></path></svg>
               </button>
