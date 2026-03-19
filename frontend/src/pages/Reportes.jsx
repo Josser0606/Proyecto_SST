@@ -226,6 +226,10 @@ function Reportes() {
       .sort((a, b) => (orden[a[0]] || 99) - (orden[b[0]] || 99))
       .map(([categoria, registros]) => ({ categoria, registros }));
   }, [datosFiltrados]);
+  const totalReconfirmaciones = useMemo(
+    () => datosFiltrados.filter((reg) => (reg.tipo_confirmacion || '').toLowerCase() === 'reconfirmacion').length,
+    [datosFiltrados]
+  );
 
   const resumenReaccionesAuditoria = useMemo(() => {
     const map = new Map();
@@ -767,13 +771,35 @@ function Reportes() {
           </button>
         </div>
 
-        <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center mb-3 sm:mb-5 gap-4 sm:gap-5">
-          <div className="min-w-0">
-            <h1 className={`text-2xl sm:text-4xl 2xl:text-[2.8rem] leading-[1] font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>Auditoria de Lectura</h1>
-            <p className={`${darkMode ? 'text-slate-400' : 'text-gray-500'} font-medium`}>Historico de lecturas por cominicado</p>
+        <section className={`mb-4 rounded-[2rem] border p-6 md:p-8 text-white shadow-xl min-h-[170px] ${
+          darkMode
+            ? 'border-green-900 bg-gradient-to-r from-green-700 to-green-800'
+            : 'border-green-200 bg-gradient-to-r from-green-600 to-green-700'
+        }`}>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-green-100 font-bold mb-2">Control de auditoria</p>
+              <h1 className="text-2xl md:text-4xl font-black text-white">Auditoria de Lectura</h1>
+              <p className="text-green-50 font-medium mt-2">Historico de lecturas por comunicado</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 md:min-w-[350px]">
+              <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Registros</p>
+                <p className="text-2xl font-black">{datosFiltrados.length}</p>
+              </div>
+              <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Categorias</p>
+                <p className="text-2xl font-black">{datosAgrupadosPorCategoria.length}</p>
+              </div>
+              <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Reconfirm.</p>
+                <p className="text-2xl font-black">{totalReconfirmaciones}</p>
+              </div>
+            </div>
           </div>
+        </section>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px] rounded-2xl border p-3 ${
+        <div className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px] rounded-2xl border p-3 mb-3 sm:mb-5 ${
             darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-gray-200 bg-white/90'
           }`}>
             <div className="relative w-full min-w-0">
@@ -833,7 +859,6 @@ function Reportes() {
               </svg>
               Exportar
             </button>
-          </div>
         </div>
 
         <div className="mb-3 flex items-center justify-between gap-2">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBell, FiCheckCircle, FiEdit2, FiHeart, FiThumbsUp, FiTrash2, FiZap } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiThumbsUp, FiTrash2, FiUpload, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 
@@ -74,6 +74,7 @@ function Dashboard() {
     contenido: '',
     categoria: 'SST y GH',
     imagenNueva: null,
+    imagenesNuevas: [],
     archivosNuevos: [],
     recursosExistentes: [],
     linksNuevos: ['']
@@ -198,6 +199,7 @@ function Dashboard() {
       String(formEdit.contenido || '').trim() !== String(snap.contenido || '').trim() ||
       String(formEdit.categoria || '') !== String(snap.categoria || '') ||
       Boolean(formEdit.imagenNueva) ||
+      (formEdit.imagenesNuevas || []).length > 0 ||
       (formEdit.archivosNuevos || []).length > 0 ||
       !recursosEqual ||
       !linksEqual
@@ -313,6 +315,7 @@ function Dashboard() {
       contenido: pub.contenido || '',
       categoria: pub.categoria || 'SST y GH',
       imagenNueva: null,
+      imagenesNuevas: [],
       archivosNuevos: [],
       recursosExistentes: recursosBase,
       linksNuevos: ['']
@@ -340,6 +343,34 @@ function Dashboard() {
   const removeLinkNuevo = (idx) => {
     setFormEdit((prev) => ({ ...prev, linksNuevos: prev.linksNuevos.filter((_, i) => i !== idx) }));
   };
+
+  const addImagenesNuevas = (fileList) => {
+    const files = Array.from(fileList || []).filter((file) => file?.type?.startsWith('image/'));
+    if (!files.length) return;
+    setFormEdit((prev) => {
+      const next = [...prev.imagenesNuevas, ...files].slice(0, 15);
+      return { ...prev, imagenesNuevas: next };
+    });
+  };
+
+  const removeImagenNuevaAt = (idx) => {
+    setFormEdit((prev) => ({ ...prev, imagenesNuevas: prev.imagenesNuevas.filter((_, i) => i !== idx) }));
+  };
+
+  const addArchivosNuevos = (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setFormEdit((prev) => {
+      const next = [...prev.archivosNuevos, ...files].slice(0, 20);
+      return { ...prev, archivosNuevos: next };
+    });
+  };
+
+  const removeArchivoNuevoAt = (idx) => {
+    setFormEdit((prev) => ({ ...prev, archivosNuevos: prev.archivosNuevos.filter((_, i) => i !== idx) }));
+  };
+
+  const shortName = (name = '') => (name.length > 34 ? `${name.slice(0, 31)}...` : name);
 
   const toggleReaccion = async (publicacionId, actual, reactionKey) => {
     if (!usuario?.id) return;
@@ -369,6 +400,7 @@ function Dashboard() {
     fd.append('contenido', formEdit.contenido);
     fd.append('categoria', formEdit.categoria);
     if (formEdit.imagenNueva) fd.append('imagen', formEdit.imagenNueva);
+    formEdit.imagenesNuevas.forEach((file) => fd.append('imagenes', file));
     formEdit.archivosNuevos.forEach((file) => fd.append('archivos', file));
     fd.append('recursos_existentes', JSON.stringify(formEdit.recursosExistentes.map((r) => r.id)));
     fd.append('links_nuevos', JSON.stringify(formEdit.linksNuevos.map((l) => l.trim()).filter(Boolean)));
@@ -717,9 +749,19 @@ function Dashboard() {
               )}
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-2">
+            <div className={`flex-1 flex flex-col items-center gap-2 ${usuario?.rol === 'admin' ? 'justify-center' : 'justify-start pt-1'}`}>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={toggleSidebar}
+                  className="w-10 h-10 rounded-xl border border-green-500 bg-green-600 text-white hover:bg-green-700 transition shadow-sm flex items-center justify-center"
+                  title="Filtros"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16"></path>
+                  </svg>
+                </button>
               {usuario?.rol === 'admin' && (
-                <div className="flex flex-col gap-2">
+                <>
                   <button
                     onClick={() => navigate('/dashboard')}
                     className="w-10 h-10 rounded-xl border border-green-500 bg-green-600 text-white hover:bg-green-700 transition shadow-sm flex items-center justify-center"
@@ -781,8 +823,9 @@ function Dashboard() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 19h16M7 16V9m5 7V5m5 11v-6"></path>
                     </svg>
                   </button>
-                </div>
+                </>
               )}
+              </div>
             </div>
           )}
         </aside>
@@ -865,7 +908,7 @@ function Dashboard() {
                 aria-expanded={showResumen}
               >
                 <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                  Resumen
+                  Resumen comunicados
                 </p>
                 <span
                   className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-transform duration-300 ${
@@ -1026,8 +1069,8 @@ function Dashboard() {
                   </div>
 
                   {editandoId === pub.id ? (
-                    <div className="space-y-4">
-                      <div className={`rounded-xl border p-3 flex items-center justify-between gap-3 ${darkMode ? 'border-green-900 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                    <div className={`space-y-5 rounded-2xl border p-4 sm:p-5 ${darkMode ? 'border-slate-700 bg-slate-800/40' : 'border-slate-200 bg-slate-50/60'}`}>
+                      <div className={`rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${darkMode ? 'border-green-900 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
                         <p className={`text-xs font-semibold ${darkMode ? 'text-green-200' : 'text-green-800'}`}>
                           Editando este comunicado. Si deseas crear uno nuevo, abre el formulario principal.
                         </p>
@@ -1039,29 +1082,111 @@ function Dashboard() {
                           Crear nuevo
                         </button>
                       </div>
-                      <input className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : ''}`} value={formEdit.titulo} onChange={(e) => setFormEdit({ ...formEdit, titulo: e.target.value })} />
-                      <select className={`w-full p-4 rounded-xl border ${darkMode ? 'bg-slate-800 border-slate-700' : ''}`} value={formEdit.categoria} onChange={(e) => setFormEdit({ ...formEdit, categoria: e.target.value })}>
-                        {CATEGORIAS.filter((c) => c !== 'Todas').map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <textarea className={`w-full p-4 rounded-xl border h-32 ${darkMode ? 'bg-slate-800 border-slate-700' : ''}`} value={formEdit.contenido} onChange={(e) => setFormEdit({ ...formEdit, contenido: e.target.value })} />
 
-                      <div className="grid sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 block mb-1">Reemplazar imagen</label>
-                          <input type="file" accept="image/*" onChange={(e) => setFormEdit({ ...formEdit, imagenNueva: e.target.files?.[0] || null })} className="w-full text-xs border rounded-lg p-2" />
+                      <div className="space-y-2">
+                        <label className={`text-[10px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Titulo</label>
+                        <input
+                          className={`w-full p-4 rounded-xl border text-sm font-semibold ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                          value={formEdit.titulo}
+                          onChange={(e) => setFormEdit({ ...formEdit, titulo: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="grid md:grid-cols-[220px_1fr] gap-4">
+                        <div className="space-y-2">
+                          <label className={`text-[10px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Area</label>
+                          <select
+                            className={`w-full p-4 rounded-xl border text-sm font-semibold ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                            value={formEdit.categoria}
+                            onChange={(e) => setFormEdit({ ...formEdit, categoria: e.target.value })}
+                          >
+                            {CATEGORIAS.filter((c) => c !== 'Todas').map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
                         </div>
-                        <div>
-                          <label className="text-xs font-bold text-slate-500 block mb-1">Nuevos adjuntos</label>
-                          <input type="file" multiple onChange={(e) => setFormEdit({ ...formEdit, archivosNuevos: Array.from(e.target.files || []) })} className="w-full text-xs border rounded-lg p-2" />
+                        <div className="space-y-2">
+                          <label className={`text-[10px] font-black uppercase tracking-wider ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Mensaje</label>
+                          <textarea
+                            className={`w-full p-4 rounded-xl border h-36 text-sm leading-relaxed ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                            value={formEdit.contenido}
+                            onChange={(e) => setFormEdit({ ...formEdit, contenido: e.target.value })}
+                          />
                         </div>
                       </div>
 
-                      <div className={`rounded-xl p-3 ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        <div className={`rounded-xl border p-3 space-y-2 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <label className={`text-xs font-bold inline-flex items-center gap-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                              <FiImage className="w-3.5 h-3.5" />
+                              Portada (opcional)
+                            </label>
+                            {formEdit.imagenNueva && (
+                              <button type="button" onClick={() => setFormEdit({ ...formEdit, imagenNueva: null })} className="text-[11px] font-bold text-red-500">
+                                Quitar
+                              </button>
+                            )}
+                          </div>
+                          <input type="file" accept="image/*" onChange={(e) => setFormEdit({ ...formEdit, imagenNueva: e.target.files?.[0] || null })} className="w-full text-xs border rounded-lg p-2" />
+                          {formEdit.imagenNueva && (
+                            <p className={`text-[11px] font-semibold ${darkMode ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                              Portada seleccionada: {shortName(formEdit.imagenNueva.name)}
+                            </p>
+                          )}
+                          <div className={`pt-2 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                            <label className={`text-xs font-bold inline-flex items-center gap-1.5 mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                              <FiImage className="w-3.5 h-3.5" />
+                              Imagenes adicionales
+                            </label>
+                            <input type="file" accept="image/*" multiple onChange={(e) => addImagenesNuevas(e.target.files)} className="w-full text-xs border rounded-lg p-2" />
+                            {!!formEdit.imagenesNuevas.length && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {formEdit.imagenesNuevas.map((file, idx) => (
+                                  <span key={`${file.name}-${idx}`} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border ${
+                                    darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'
+                                  }`}>
+                                    {shortName(file.name)}
+                                    <button type="button" onClick={() => removeImagenNuevaAt(idx)} className="text-red-500">
+                                      <FiX className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className={`rounded-xl border p-3 space-y-2 ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
+                          <label className={`text-xs font-bold inline-flex items-center gap-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                            <FiFileText className="w-3.5 h-3.5" />
+                            Nuevos adjuntos
+                          </label>
+                          <input type="file" multiple onChange={(e) => addArchivosNuevos(e.target.files)} className="w-full text-xs border rounded-lg p-2" />
+                          {!!formEdit.archivosNuevos.length && (
+                            <div className="flex flex-wrap gap-2">
+                              {formEdit.archivosNuevos.map((file, idx) => (
+                                <span key={`${file.name}-${idx}`} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] border ${
+                                  darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'
+                                }`}>
+                                  {shortName(file.name)}
+                                  <button type="button" onClick={() => removeArchivoNuevoAt(idx)} className="text-red-500">
+                                    <FiX className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Puedes agregar varios archivos en tandas.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className={`rounded-xl p-3 border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                         <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Recursos actuales (quitar para eliminar)</p>
                         <div className="flex flex-wrap gap-2">
                           {formEdit.recursosExistentes.map((r) => (
                             <button key={r.id} type="button" onClick={() => quitarRecursoExistente(r.id)} className={`text-xs px-3 py-1.5 rounded-full border hover:border-red-300 hover:text-red-600 ${
-                              darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200'
+                              darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200'
                             }`}>
                               {r.tipo === 'archivo' ? 'Archivo: ' : 'Link: '}{r.nombre} x
                             </button>
@@ -1070,22 +1195,33 @@ function Dashboard() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className={`space-y-2 rounded-xl p-3 border ${darkMode ? 'border-slate-700 bg-slate-900/60' : 'border-slate-200 bg-white'}`}>
                         <div className="flex justify-between items-center">
-                          <p className={`text-xs font-bold ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Agregar links nuevos</p>
-                          <button type="button" onClick={addLinkNuevo} className="text-xs font-bold text-green-700">+ Link</button>
+                          <p className={`text-xs font-bold inline-flex items-center gap-1.5 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>
+                            <FiLink2 className="w-3.5 h-3.5" />
+                            Links nuevos
+                          </p>
+                          <button type="button" onClick={addLinkNuevo} className="text-xs font-bold text-green-700 inline-flex items-center gap-1">
+                            <FiUpload className="w-3.5 h-3.5" />
+                            Agregar
+                          </button>
                         </div>
                         {formEdit.linksNuevos.map((l, idx) => (
                           <div key={idx} className="flex gap-2">
                             <input type="url" value={l} onChange={(e) => setLinkNuevoAt(idx, e.target.value)} className={`flex-1 text-sm border rounded-lg px-3 py-2 ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : ''}`} placeholder="https://..." />
-                            {formEdit.linksNuevos.length > 1 && <button type="button" onClick={() => removeLinkNuevo(idx)} className={`px-3 border rounded-lg text-red-600 ${darkMode ? 'border-slate-700 bg-slate-900' : ''}`}>X</button>}
+                            {formEdit.linksNuevos.length > 1 && <button type="button" onClick={() => removeLinkNuevo(idx)} className={`px-3 border rounded-lg text-red-600 ${darkMode ? 'border-slate-700 bg-slate-900' : ''}`}><FiX className="w-3.5 h-3.5" /></button>}
                           </div>
                         ))}
                       </div>
 
-                      <div>
-                        <button onClick={() => guardarEdicion(pub.id)} className="bg-green-600 text-white px-6 py-2 rounded-xl text-xs font-bold">Guardar</button>
-                        <button onClick={() => { editSnapshotRef.current = null; setEditandoId(null); }} className="ml-4 text-xs font-bold opacity-50">Cancelar</button>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button onClick={() => guardarEdicion(pub.id)} className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider">
+                          <FiCheckCircle className="w-4 h-4" />
+                          Guardar cambios
+                        </button>
+                        <button onClick={() => { editSnapshotRef.current = null; setEditandoId(null); }} className={`px-4 py-2.5 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-white'}`}>
+                          Cancelar
+                        </button>
                       </div>
                     </div>
                   ) : (

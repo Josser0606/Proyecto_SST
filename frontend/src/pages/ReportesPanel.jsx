@@ -360,14 +360,37 @@ function ReportesPanel() {
               <button onClick={() => navigate('/reportes-panel')} className="px-2 py-2.5 rounded-xl bg-green-600 text-white text-[11px] font-black">Panel</button>
             </div>
 
-          <div className="mb-4 sm:mb-5">
-            <h1 className={`text-2xl sm:text-4xl 2xl:text-[2.8rem] leading-[1] font-black tracking-tight ${darkMode ? 'text-white' : 'text-slate-800'}`}>
-              Auditoria de registros
-            </h1>
-            <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} font-medium`}>
-              Esta vista queda enfocada en consulta, filtros, eliminacion y exportacion.
-            </p>
-          </div>
+          <section className={`mb-4 rounded-[2rem] border p-6 md:p-8 text-white shadow-xl min-h-[170px] ${
+            darkMode
+              ? 'border-green-900 bg-gradient-to-r from-green-700 to-green-800'
+              : 'border-green-200 bg-gradient-to-r from-green-600 to-green-700'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-green-100 font-bold mb-2">Analitica operativa</p>
+                <h1 className="text-2xl md:text-4xl font-black text-white">
+                  Panel de auditoria
+                </h1>
+                <p className="text-green-50 font-medium mt-2">
+                  Seguimiento de actividad, calendario y reacciones.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 md:min-w-[350px]">
+                <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Registros</p>
+                  <p className="text-2xl font-black">{datosFiltrados.length}</p>
+                </div>
+                <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Reacciones</p>
+                  <p className="text-2xl font-black">{resumenReaccionesAuditoria.totalReacciones}</p>
+                </div>
+                <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
+                  <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Top</p>
+                  <p className="text-2xl font-black">{topComunicadosReaccionados.length}</p>
+                </div>
+              </div>
+            </div>
+          </section>
 
           <section className={`rounded-[24px] border p-4 transition-all duration-300 ${darkMode ? 'bg-slate-900 border-slate-800 shadow-xl shadow-black/20' : 'bg-white border-gray-100 shadow-[0_16px_40px_-20px_rgba(15,23,42,0.35)]'}`}>
             <div className="flex items-center justify-between mb-3">

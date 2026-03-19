@@ -32,6 +32,7 @@ function Login() {
   // Función que se dispara al dar clic en el botón del formulario
   const handlePreLogin = async (e) => {
     e.preventDefault();
+    if (loading) return;
     const nombreLimpio = nombre.trim();
     if (!nombreLimpio) return toast.error("Por favor escribe tu nombre");
 
@@ -45,6 +46,7 @@ function Login() {
   };
 
   const handleLogin = async () => {
+    if (loading) return;
     setMostrarConfirmacion(false); // Cerramos el modal si estaba abierto
     setLoading(true);
     const nombreLimpio = nombre.trim();
@@ -120,15 +122,17 @@ function Login() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
                   onClick={() => setMostrarConfirmacion(false)}
+                  disabled={loading}
                   className="flex-1 py-4 font-bold text-gray-400 hover:text-gray-600 transition-colors text-xs uppercase tracking-widest"
                 >
                   Corregir
                 </button>
                 <button 
                   onClick={handleLogin}
-                  className="flex-1 bg-green-600 py-4 rounded-2xl font-black text-white text-xs uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-700 transition-all"
+                  disabled={loading}
+                  className="flex-1 bg-green-600 py-4 rounded-2xl font-black text-white text-xs uppercase tracking-widest shadow-lg shadow-green-200 hover:bg-green-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Confirmar
+                  {loading ? 'Verificando...' : 'Confirmar'}
                 </button>
               </div>
             </div>
@@ -169,7 +173,7 @@ function Login() {
                 className={`w-full px-5 sm:px-6 py-4 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none transition-all font-bold text-slate-700 ${pedirPass ? 'bg-gray-100 text-gray-400' : 'bg-gray-50'}`}
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                disabled={pedirPass}
+                disabled={pedirPass || loading}
               />
             </div>
 
@@ -178,9 +182,10 @@ function Login() {
               <div className="animate-in fade-in duration-500">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">Área</label>
                 <select 
-                  className="w-full px-5 sm:px-6 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-700 appearance-none"
+                  className="w-full px-5 sm:px-6 py-4 bg-gray-50 border-none rounded-2xl focus:ring-2 focus:ring-green-500 outline-none font-bold text-slate-700 appearance-none disabled:opacity-70"
                   value={area}
                   onChange={(e) => setArea(e.target.value)}
+                  disabled={loading}
                 >
                   <option value="SST y GH">SST y GH</option>
                   <option value="Aseguramineto de Calidad">Aseguramineto de Calidad</option>
@@ -203,16 +208,18 @@ function Login() {
                     className="w-full px-5 sm:px-6 pr-12 py-4 border-2 border-red-100 rounded-2xl focus:ring-2 focus:ring-red-500 outline-none bg-red-50 font-bold text-slate-800"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
                     aria-label={showPassword ? 'Ocultar contrasena' : 'Ver contrasena'}
+                    disabled={loading}
                     className={`absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full border shadow-sm transition-all duration-200 hover:scale-110 ${
                       showPassword
                         ? 'text-red-700 bg-red-100 border-red-200'
                         : 'text-slate-700 bg-white border-slate-200'
-                    }`}
+                    } disabled:opacity-60 disabled:cursor-not-allowed`}
                   >
                     {showPassword ? (
                       <FiEyeOff className="text-lg transition-transform duration-200 rotate-0 scale-100" />
@@ -228,7 +235,7 @@ function Login() {
             <button 
               type="submit" 
               disabled={loading}
-              className={`w-full text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all duration-300 shadow-xl ${pedirPass ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200'} hover:-translate-y-1`}
+              className={`w-full text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all duration-300 shadow-xl ${pedirPass ? 'bg-red-600 hover:bg-red-700 shadow-red-200' : 'bg-green-600 hover:bg-green-700 shadow-green-200'} hover:-translate-y-1 disabled:opacity-70 disabled:hover:translate-y-0 disabled:cursor-not-allowed`}
             >
               {loading ? 'Verificando...' : (pedirPass ? 'Confirmar Identidad' : 'Ingresar')}
             </button>
@@ -237,7 +244,8 @@ function Login() {
               <button 
                 type="button" 
                 onClick={() => { setPedirPass(false); setPassword(''); }}
-                className="w-full text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:text-green-600 transition-colors"
+                disabled={loading}
+                className="w-full text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:text-green-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 ← Cambiar usuario
               </button>
