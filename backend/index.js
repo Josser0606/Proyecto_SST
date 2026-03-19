@@ -648,6 +648,30 @@ const initSchema = async () => {
       FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
     )
   `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS publicacion_favoritos (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      publicacion_id INT NOT NULL,
+      usuario_id INT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_pub_favorito_usuario (publicacion_id, usuario_id),
+      FOREIGN KEY (publicacion_id) REFERENCES publicaciones(id) ON DELETE CASCADE,
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )
+  `);
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS publicacion_comentarios (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      publicacion_id INT NOT NULL,
+      usuario_id INT NOT NULL,
+      comentario VARCHAR(280) NOT NULL,
+      eliminado TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (publicacion_id) REFERENCES publicaciones(id) ON DELETE CASCADE,
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    )
+  `);
   try {
     await db.query("ALTER TABLE publicacion_reacciones MODIFY COLUMN reaccion ENUM('util','importante','me-gusta') NOT NULL");
   } catch (error) {
@@ -674,6 +698,21 @@ const initSchema = async () => {
 
   try {
     await db.query('CREATE INDEX idx_pub_reacciones_pub_reaccion ON publicacion_reacciones(publicacion_id, reaccion)');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+  try {
+    await db.query('CREATE INDEX idx_pub_favoritos_pub_usuario ON publicacion_favoritos(publicacion_id, usuario_id)');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+  try {
+    await db.query('CREATE INDEX idx_pub_comentarios_pub_fecha ON publicacion_comentarios(publicacion_id, created_at)');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_KEYNAME') throw error;
+  }
+  try {
+    await db.query('CREATE INDEX idx_pub_comentarios_usuario_fecha ON publicacion_comentarios(usuario_id, created_at)');
   } catch (error) {
     if (error.code !== 'ER_DUP_KEYNAME') throw error;
   }
@@ -765,6 +804,19 @@ const getPublicacionesWithRecursos = async (usuarioId) => {
      WHERE usuario_id = ? AND publicacion_id IN (?)`,
     [usuarioId || 0, ids]
   );
+  const [favoritosUsuarioRows] = await db.query(
+    `SELECT publicacion_id
+     FROM publicacion_favoritos
+     WHERE usuario_id = ? AND publicacion_id IN (?)`,
+    [usuarioId || 0, ids]
+  );
+  const [comentariosCountRows] = await db.query(
+    `SELECT publicacion_id, COUNT(*) AS total
+     FROM publicacion_comentarios
+     WHERE publicacion_id IN (?) AND COALESCE(eliminado, 0) = 0
+     GROUP BY publicacion_id`,
+    [ids]
+  );
 
   const recursosMap = new Map();
   recursos.forEach((r) => {
@@ -786,12 +838,19 @@ const getPublicacionesWithRecursos = async (usuarioId) => {
   reaccionUsuarioRows.forEach((r) => {
     reaccionUsuarioMap.set(r.publicacion_id, r.reaccion);
   });
+  const favoritosSet = new Set(favoritosUsuarioRows.map((r) => Number(r.publicacion_id)));
+  const comentariosCountMap = new Map();
+  comentariosCountRows.forEach((r) => {
+    comentariosCountMap.set(Number(r.publicacion_id), Number(r.total || 0));
+  });
 
   return publicaciones.map((p) => ({
     ...p,
     recursos: recursosMap.get(p.id) || [],
     reacciones: reaccionesMap.get(p.id) || { util: 0, importante: 0, 'me-gusta': 0, total: 0 },
-    reaccion_usuario: reaccionUsuarioMap.get(p.id) || null
+    reaccion_usuario: reaccionUsuarioMap.get(p.id) || null,
+    favorito_usuario: favoritosSet.has(Number(p.id)),
+    comentarios_total: comentariosCountMap.get(Number(p.id)) || 0
   }));
 };
 
@@ -1058,12 +1117,260 @@ app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/me', requireAuth, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
+       FROM usuarios
+       WHERE id = ?
+       LIMIT 1`,
+      [req.user.id]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+    }
+    return res.json({ success: true, usuario: rows[0] });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.put('/api/me', requireAuth, async (req, res) => {
+  const emailNormalizado = normalizeEmail(req.body?.email);
+  const notificarEmail = req.body?.notificar_email !== false;
+
+  if (emailNormalizado && !isValidEmail(emailNormalizado)) {
+    return res.status(400).json({ success: false, message: 'Correo electronico invalido' });
+  }
+
+  try {
+    if (emailNormalizado) {
+      const [exists] = await db.query(
+        'SELECT id FROM usuarios WHERE LOWER(TRIM(email)) = ? AND id <> ? LIMIT 1',
+        [emailNormalizado, req.user.id]
+      );
+      if (exists.length) {
+        return res.status(409).json({ success: false, message: 'Ese correo ya esta asignado a otro usuario' });
+      }
+    }
+
+    await db.query(
+      'UPDATE usuarios SET email = ?, notificar_email = ? WHERE id = ?',
+      [emailNormalizado || null, notificarEmail ? 1 : 0, req.user.id]
+    );
+
+    await logAudit({
+      userId: req.user?.id,
+      action: 'profile.update',
+      entity: 'user',
+      entityId: Number(req.user.id),
+      metadata: { notificar_email: notificarEmail ? 1 : 0 },
+      req
+    });
+
+    const [rows] = await db.query(
+      `SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
+       FROM usuarios
+       WHERE id = ?
+       LIMIT 1`,
+      [req.user.id]
+    );
+    return res.json({ success: true, usuario: rows[0] || null });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.get('/api/publicaciones', requireAuth, async (req, res) => {
   try {
     const rows = await getPublicacionesWithRecursos(req.user?.id || 0);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/publicaciones/:id/favorito', requireAuth, async (req, res) => {
+  const publicacionId = Number(req.params.id);
+  const usuarioId = Number(req.user?.id || 0);
+  const favorito = req.body?.favorito !== false;
+
+  if (!publicacionId || !usuarioId) {
+    return res.status(400).json({ success: false, message: 'Datos invalidos para favorito' });
+  }
+
+  try {
+    const [pub] = await db.query(
+      'SELECT id FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+      [publicacionId]
+    );
+    if (!pub.length) {
+      return res.status(404).json({ success: false, message: 'Comunicado no encontrado' });
+    }
+
+    if (favorito) {
+      await db.query(
+        `INSERT INTO publicacion_favoritos (publicacion_id, usuario_id)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE created_at = created_at`,
+        [publicacionId, usuarioId]
+      );
+      await logAudit({
+        userId: usuarioId,
+        action: 'publication.favorite.add',
+        entity: 'publication',
+        entityId: publicacionId,
+        req
+      });
+    } else {
+      await db.query(
+        'DELETE FROM publicacion_favoritos WHERE publicacion_id = ? AND usuario_id = ?',
+        [publicacionId, usuarioId]
+      );
+      await logAudit({
+        userId: usuarioId,
+        action: 'publication.favorite.remove',
+        entity: 'publication',
+        entityId: publicacionId,
+        req
+      });
+    }
+
+    const [countRows] = await db.query(
+      'SELECT COUNT(*) AS total FROM publicacion_favoritos WHERE publicacion_id = ?',
+      [publicacionId]
+    );
+    return res.json({
+      success: true,
+      favorito_usuario: favorito,
+      favoritos_total: Number(countRows[0]?.total || 0)
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get('/api/publicaciones/:id/comentarios', requireAuth, async (req, res) => {
+  const publicacionId = Number(req.params.id);
+  const limit = Math.min(Math.max(Number(req.query?.limit || 20), 1), 60);
+  if (!publicacionId) {
+    return res.status(400).json({ success: false, message: 'Publicacion invalida' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT pc.id, pc.publicacion_id, pc.usuario_id, pc.comentario, pc.created_at, pc.updated_at,
+              u.nombre_completo AS usuario_nombre
+       FROM publicacion_comentarios pc
+       INNER JOIN usuarios u ON u.id = pc.usuario_id
+       WHERE pc.publicacion_id = ? AND COALESCE(pc.eliminado, 0) = 0
+       ORDER BY pc.created_at DESC
+       LIMIT ?`,
+      [publicacionId, limit]
+    );
+    return res.json({ success: true, comentarios: rows });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/publicaciones/:id/comentarios', requireAuth, async (req, res) => {
+  const publicacionId = Number(req.params.id);
+  const usuarioId = Number(req.user?.id || 0);
+  const comentario = String(req.body?.comentario || '').trim();
+
+  if (!publicacionId || !usuarioId || !comentario) {
+    return res.status(400).json({ success: false, message: 'Comentario invalido' });
+  }
+  if (comentario.length > 280) {
+    return res.status(400).json({ success: false, message: 'El comentario no puede superar 280 caracteres' });
+  }
+
+  try {
+    const [pub] = await db.query(
+      'SELECT id FROM publicaciones WHERE id = ? AND COALESCE(eliminada, 0) = 0 LIMIT 1',
+      [publicacionId]
+    );
+    if (!pub.length) {
+      return res.status(404).json({ success: false, message: 'Comunicado no encontrado' });
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO publicacion_comentarios (publicacion_id, usuario_id, comentario)
+       VALUES (?, ?, ?)`,
+      [publicacionId, usuarioId, comentario]
+    );
+
+    const [rows] = await db.query(
+      `SELECT pc.id, pc.publicacion_id, pc.usuario_id, pc.comentario, pc.created_at, pc.updated_at,
+              u.nombre_completo AS usuario_nombre
+       FROM publicacion_comentarios pc
+       INNER JOIN usuarios u ON u.id = pc.usuario_id
+       WHERE pc.id = ?
+       LIMIT 1`,
+      [result.insertId]
+    );
+
+    await logAudit({
+      userId: usuarioId,
+      action: 'publication.comment.create',
+      entity: 'publication_comment',
+      entityId: result.insertId,
+      metadata: { publicacion_id: publicacionId },
+      req
+    });
+
+    const [countRows] = await db.query(
+      'SELECT COUNT(*) AS total FROM publicacion_comentarios WHERE publicacion_id = ? AND COALESCE(eliminado, 0) = 0',
+      [publicacionId]
+    );
+
+    return res.status(201).json({
+      success: true,
+      comentario: rows[0] || null,
+      comentarios_total: Number(countRows[0]?.total || 0)
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.delete('/api/publicaciones/:id/comentarios/:comentarioId', requireAuth, async (req, res) => {
+  const publicacionId = Number(req.params.id);
+  const comentarioId = Number(req.params.comentarioId);
+  const usuarioId = Number(req.user?.id || 0);
+  if (!publicacionId || !comentarioId || !usuarioId) {
+    return res.status(400).json({ success: false, message: 'Parametros invalidos' });
+  }
+  try {
+    const [rows] = await db.query(
+      'SELECT id, usuario_id FROM publicacion_comentarios WHERE id = ? AND publicacion_id = ? LIMIT 1',
+      [comentarioId, publicacionId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: 'Comentario no encontrado' });
+    }
+    const isOwner = Number(rows[0].usuario_id) === usuarioId;
+    const isAdmin = req.user?.rol === 'admin';
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ success: false, message: 'No autorizado para eliminar este comentario' });
+    }
+
+    await db.query(
+      'UPDATE publicacion_comentarios SET eliminado = 1 WHERE id = ?',
+      [comentarioId]
+    );
+    await logAudit({
+      userId: usuarioId,
+      action: 'publication.comment.delete',
+      entity: 'publication_comment',
+      entityId: comentarioId,
+      metadata: { publicacion_id: publicacionId },
+      req
+    });
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -1094,6 +1401,13 @@ app.post('/api/publicaciones/:id/reaccion', requireAuth, async (req, res) => {
         'DELETE FROM publicacion_reacciones WHERE publicacion_id = ? AND usuario_id = ?',
         [publicacionId, usuarioId]
       );
+      await logAudit({
+        userId: usuarioId,
+        action: 'publication.reaction.remove',
+        entity: 'publication',
+        entityId: publicacionId,
+        req
+      });
     } else {
       await db.query(
         `INSERT INTO publicacion_reacciones (publicacion_id, usuario_id, reaccion)
@@ -1101,6 +1415,14 @@ app.post('/api/publicaciones/:id/reaccion', requireAuth, async (req, res) => {
          ON DUPLICATE KEY UPDATE reaccion = VALUES(reaccion), updated_at = CURRENT_TIMESTAMP`,
         [publicacionId, usuarioId, reaccion]
       );
+      await logAudit({
+        userId: usuarioId,
+        action: 'publication.reaction.set',
+        entity: 'publication',
+        entityId: publicacionId,
+        metadata: { reaccion },
+        req
+      });
     }
 
     const [resumenRows] = await db.query(
@@ -1421,6 +1743,13 @@ app.post('/api/registrar-vista', requireAuth, async (req, res) => {
         throw insertError;
       }
     }
+    await logAudit({
+      userId: req.user?.id,
+      action: esReconfirmacion ? 'publication.read.reconfirm' : 'publication.read.confirm',
+      entity: 'publication',
+      entityId: Number(publicacion_id),
+      req
+    });
     res.json({ success: true });
   } catch (error) {
     console.error('Error en /api/registrar-vista:', error.message);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBell, FiCheckCircle, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiThumbsUp, FiTrash2, FiUpload, FiX, FiZap } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiClock, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiStar, FiThumbsUp, FiTrash2, FiUpload, FiUser, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 
@@ -67,6 +67,15 @@ function Dashboard() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsSeen, setNotificationsSeen] = useState({});
   const [panelAbierto, setPanelAbierto] = useState(null);
+  const [soloFavoritos, setSoloFavoritos] = useState(false);
+  const [comentariosPorPub, setComentariosPorPub] = useState({});
+  const [comentarioDraft, setComentarioDraft] = useState({});
+  const [comentariosOpen, setComentariosOpen] = useState({});
+  const [cargandoComentarios, setCargandoComentarios] = useState({});
+  const [miPerfil, setMiPerfil] = useState(null);
+  const [perfilOpen, setPerfilOpen] = useState(false);
+  const [perfilForm, setPerfilForm] = useState({ email: '', notificar_email: true });
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState({
@@ -169,6 +178,26 @@ function Dashboard() {
     }
     void cargarPublicaciones();
   }, [navigate, usuario, cargarPublicaciones]);
+
+  const cargarPerfil = useCallback(async () => {
+    try {
+      const { data } = await axios.get(apiUrl('/api/me'));
+      if (data?.usuario) {
+        setMiPerfil(data.usuario);
+        setPerfilForm({
+          email: data.usuario.email || '',
+          notificar_email: Number(data.usuario.notificar_email) !== 0
+        });
+      }
+    } catch {
+      // noop
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+    void cargarPerfil();
+  }, [usuario?.id, cargarPerfil]);
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -394,6 +423,89 @@ function Dashboard() {
     }
   };
 
+  const toggleFavorito = async (publicacionId, favoritoActual) => {
+    try {
+      const { data } = await axios.post(apiUrl(`/api/publicaciones/${publicacionId}/favorito`), {
+        favorito: !favoritoActual
+      });
+      setPublicaciones((prev) => prev.map((p) => (
+        p.id === publicacionId
+          ? { ...p, favorito_usuario: Boolean(data?.favorito_usuario) }
+          : p
+      )));
+      toast.success(!favoritoActual ? 'Guardado en favoritos' : 'Quitado de favoritos');
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'No fue posible actualizar favoritos';
+      toast.error(msg);
+    }
+  };
+
+  const cargarComentarios = async (publicacionId, forzar = false) => {
+    if (!forzar && comentariosPorPub[publicacionId]) return;
+    setCargandoComentarios((prev) => ({ ...prev, [publicacionId]: true }));
+    try {
+      const { data } = await axios.get(apiUrl(`/api/publicaciones/${publicacionId}/comentarios?limit=20`));
+      setComentariosPorPub((prev) => ({
+        ...prev,
+        [publicacionId]: Array.isArray(data?.comentarios) ? data.comentarios : []
+      }));
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'No fue posible cargar comentarios';
+      toast.error(msg);
+    } finally {
+      setCargandoComentarios((prev) => ({ ...prev, [publicacionId]: false }));
+    }
+  };
+
+  const enviarComentario = async (publicacionId) => {
+    const texto = String(comentarioDraft[publicacionId] || '').trim();
+    if (!texto) return;
+    try {
+      const { data } = await axios.post(apiUrl(`/api/publicaciones/${publicacionId}/comentarios`), {
+        comentario: texto
+      });
+      setComentarioDraft((prev) => ({ ...prev, [publicacionId]: '' }));
+      if (data?.comentario) {
+        setComentariosPorPub((prev) => ({
+          ...prev,
+          [publicacionId]: [data.comentario, ...(prev[publicacionId] || [])]
+        }));
+      } else {
+        await cargarComentarios(publicacionId, true);
+      }
+      setPublicaciones((prev) => prev.map((p) => (
+        p.id === publicacionId
+          ? { ...p, comentarios_total: Number(data?.comentarios_total ?? ((p.comentarios_total || 0) + 1)) }
+          : p
+      )));
+      toast.success('Comentario publicado');
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'No fue posible comentar';
+      toast.error(msg);
+    }
+  };
+
+  const guardarPerfil = async () => {
+    setGuardandoPerfil(true);
+    try {
+      const payload = {
+        email: perfilForm.email,
+        notificar_email: Boolean(perfilForm.notificar_email)
+      };
+      const { data } = await axios.put(apiUrl('/api/me'), payload);
+      if (data?.usuario) {
+        setMiPerfil(data.usuario);
+      }
+      toast.success('Perfil actualizado');
+      setPerfilOpen(false);
+    } catch (error) {
+      const msg = error?.response?.data?.message || 'No fue posible guardar el perfil';
+      toast.error(msg);
+    } finally {
+      setGuardandoPerfil(false);
+    }
+  };
+
   const guardarEdicion = async (id) => {
     const fd = new FormData();
     fd.append('titulo', formEdit.titulo);
@@ -429,6 +541,7 @@ function Dashboard() {
 
     const filtered = publicaciones
       .filter((pub) => categoriaFiltro === 'Todas' || pub.categoria === categoriaFiltro)
+      .filter((pub) => !soloFavoritos || Boolean(pub.favorito_usuario))
       .map((pub, idx) => {
         if (!tokens.length) return { pub, idx, score: 0 };
 
@@ -465,7 +578,7 @@ function Dashboard() {
       .map((item) => item.pub);
 
     return filtered;
-  }, [publicaciones, categoriaFiltro, busqueda, searchScopes]);
+  }, [publicaciones, categoriaFiltro, busqueda, searchScopes, soloFavoritos]);
 
   const highlightText = useCallback((text) => {
     const raw = String(text || '');
@@ -637,6 +750,13 @@ function Dashboard() {
           <button onClick={toggleDarkMode} className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}>
             {darkMode ? 'Claro' : 'Oscuro'}
           </button>
+          <button
+            onClick={() => setPerfilOpen(true)}
+            className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}
+            title="Mi perfil"
+          >
+            <FiUser className="w-5 h-5" />
+          </button>
           <div className={`text-right border-r pr-2 sm:pr-4 min-w-0 ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
             <p className="text-xs sm:text-sm font-black max-w-[140px] sm:max-w-none truncate">{usuario?.nombre_completo}</p>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuario?.area}</p>
@@ -749,7 +869,7 @@ function Dashboard() {
               )}
             </div>
           ) : (
-            <div className={`flex-1 flex flex-col items-center gap-2 ${usuario?.rol === 'admin' ? 'justify-center' : 'justify-start pt-1'}`}>
+            <div className="flex-1 flex flex-col items-center justify-start pt-1 gap-2">
               <div className="flex flex-col gap-2">
                 <button
                   onClick={toggleSidebar}
@@ -985,6 +1105,19 @@ function Dashboard() {
               </div>
             </section>
           </div>
+
+          {(totalPendientes > 0 || totalPendientesReconfirmar > 0) && (
+            <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-start gap-2 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
+              <FiClock className={`w-4 h-4 mt-0.5 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`} />
+              <div className="text-sm">
+                <p className={`font-black ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>Recordatorio amable</p>
+                <p className={`${darkMode ? 'text-amber-100/90' : 'text-amber-700'}`}>
+                  Tienes {totalPendientes} pendiente(s) y {totalPendientesReconfirmar} por reconfirmar.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4 sm:mb-6">
             <div className="relative">
               <input
@@ -1015,10 +1148,26 @@ function Dashboard() {
                 </button>
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between">
-              <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSoloFavoritos((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-black transition ${
+                    soloFavoritos
+                      ? 'bg-green-600 border-green-600 text-white'
+                      : darkMode
+                        ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-green-500 hover:text-green-300'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  <FiStar className="w-3.5 h-3.5" />
+                  Favoritos
+                </button>
+                <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 Resultados ordenados por relevancia.
-              </p>
+                </p>
+              </div>
               <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 {publicacionesFiltradas.length} resultado(s)
               </p>
@@ -1296,22 +1445,100 @@ function Dashboard() {
                           })}
                         </div>
                       </div>
+
+                      <div className={`mb-2 p-4 rounded-2xl border ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Comentarios</p>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const next = !comentariosOpen[pub.id];
+                              setComentariosOpen((prev) => ({ ...prev, [pub.id]: next }));
+                              if (next) await cargarComentarios(pub.id);
+                            }}
+                            className={`text-[11px] font-black px-2.5 py-1 rounded-lg border ${
+                              darkMode ? 'border-slate-700 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-600'
+                            }`}
+                          >
+                            {comentariosOpen[pub.id] ? 'Ocultar' : 'Ver'} ({Number(pub.comentarios_total || 0)})
+                          </button>
+                        </div>
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={comentarioDraft[pub.id] || ''}
+                            onChange={(e) => setComentarioDraft((prev) => ({ ...prev, [pub.id]: e.target.value.slice(0, 280) }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void enviarComentario(pub.id);
+                              }
+                            }}
+                            placeholder="Escribe un comentario corto..."
+                            className={`flex-1 px-3 py-2 rounded-lg border text-sm ${
+                              darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => enviarComentario(pub.id)}
+                            className="px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-black"
+                          >
+                            Enviar
+                          </button>
+                        </div>
+                        {comentariosOpen[pub.id] && (
+                          <div className={`max-h-44 overflow-y-auto sidebar-scroll pr-1 space-y-1.5 ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
+                            {cargandoComentarios[pub.id] && (
+                              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Cargando comentarios...</p>
+                            )}
+                            {!cargandoComentarios[pub.id] && !(comentariosPorPub[pub.id] || []).length && (
+                              <p className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aun no hay comentarios.</p>
+                            )}
+                            {(comentariosPorPub[pub.id] || []).map((comentario) => (
+                              <div key={comentario.id} className={`rounded-lg border px-2.5 py-2 ${
+                                darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-white text-slate-700'
+                              }`}>
+                                <p className="text-[11px] font-black">{comentario.usuario_nombre}</p>
+                                <p className="text-xs break-words">{comentario.comentario}</p>
+                                <p className={`text-[10px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>{new Date(comentario.created_at).toLocaleString()}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
 
                   <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-8 border-t ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
-                    <button
-                      onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id, requiereReconfirmacion)}
-                      disabled={leidoVigente || bloqueoPorPlazo}
-                      className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                        leidoVigente || bloqueoPorPlazo
-                          ? (darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-300')
-                          : 'bg-green-600 text-white shadow-xl hover:bg-green-700 hover:-translate-y-1'
-                      }`}
-                      title={bloqueoPorPlazo ? 'El plazo de confirmacion ya vencio' : ''}
-                    >
-                      {etiquetaLectura}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id, requiereReconfirmacion)}
+                        disabled={leidoVigente || bloqueoPorPlazo}
+                        className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                          leidoVigente || bloqueoPorPlazo
+                            ? (darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-300')
+                            : 'bg-green-600 text-white shadow-xl hover:bg-green-700 hover:-translate-y-1'
+                        }`}
+                        title={bloqueoPorPlazo ? 'El plazo de confirmacion ya vencio' : ''}
+                      >
+                        {etiquetaLectura}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleFavorito(pub.id, Boolean(pub.favorito_usuario))}
+                        className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-black transition ${
+                          pub.favorito_usuario
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : darkMode
+                              ? 'border-slate-700 bg-slate-900 text-slate-300 hover:border-amber-500 hover:text-amber-300'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:text-amber-700'
+                        }`}
+                      >
+                        <FiStar className="w-4 h-4" />
+                        {pub.favorito_usuario ? 'Favorito' : 'Guardar'}
+                      </button>
+                    </div>
 
                     {usuario?.rol === 'admin' && editandoId !== pub.id && (
                       <div className="flex flex-wrap gap-2">
@@ -1347,6 +1574,66 @@ function Dashboard() {
           </div>
         </main>
       </div>
+
+      {perfilOpen && (
+        <div className="fixed inset-0 z-[80] bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center p-4">
+          <div className={`w-full max-w-md rounded-2xl border p-4 sm:p-5 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi perfil</h3>
+              <button
+                type="button"
+                onClick={() => setPerfilOpen(false)}
+                className={`w-8 h-8 rounded-lg border flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-white text-slate-500'}`}
+              >
+                <FiX className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Nombre</p>
+                <div className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                  {miPerfil?.nombre_completo || usuario?.nombre_completo}
+                </div>
+              </div>
+              <div>
+                <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Correo</p>
+                <input
+                  type="email"
+                  value={perfilForm.email}
+                  onChange={(e) => setPerfilForm((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="correo@empresa.com"
+                  className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                />
+              </div>
+              <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(perfilForm.notificar_email)}
+                  onChange={(e) => setPerfilForm((prev) => ({ ...prev, notificar_email: e.target.checked }))}
+                />
+                Recibir notificaciones por correo
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPerfilOpen(false)}
+                className={`px-3 py-2 rounded-lg border text-xs font-black ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={guardandoPerfil}
+                onClick={guardarPerfil}
+                className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-xs font-black"
+              >
+                {guardandoPerfil ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
