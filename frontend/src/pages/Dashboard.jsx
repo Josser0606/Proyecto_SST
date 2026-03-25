@@ -757,7 +757,7 @@ function Dashboard() {
           >
             <FiUser className="w-5 h-5" />
           </button>
-          <div className={`text-right border-r pr-2 sm:pr-4 min-w-0 ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
+          <div className={`hidden md:block text-right border-r pr-2 sm:pr-4 min-w-0 ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
             <p className="text-xs sm:text-sm font-black max-w-[140px] sm:max-w-none truncate">{usuario?.nombre_completo}</p>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuario?.area}</p>
           </div>
