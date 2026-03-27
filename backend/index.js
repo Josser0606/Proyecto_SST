@@ -564,6 +564,26 @@ const initSchema = async () => {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
   }
   try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN avatar_url TEXT NULL');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN notif_nuevo_comunicado TINYINT(1) NOT NULL DEFAULT 1');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN notif_reconfirmacion TINYINT(1) NOT NULL DEFAULT 1');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
+    await db.query('ALTER TABLE usuarios ADD COLUMN notif_recordatorio TINYINT(1) NOT NULL DEFAULT 1');
+  } catch (error) {
+    if (error.code !== 'ER_DUP_FIELDNAME') throw error;
+  }
+  try {
     await db.query('ALTER TABLE usuarios ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0');
   } catch (error) {
     if (error.code !== 'ER_DUP_FIELDNAME') throw error;
@@ -1120,7 +1140,12 @@ app.delete('/api/usuarios/:id', requireAuth, requireAdmin, async (req, res) => {
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
+      `SELECT id, nombre_completo, area, rol, email,
+              COALESCE(notificar_email, 1) AS notificar_email,
+              avatar_url,
+              COALESCE(notif_nuevo_comunicado, 1) AS notif_nuevo_comunicado,
+              COALESCE(notif_reconfirmacion, 1) AS notif_reconfirmacion,
+              COALESCE(notif_recordatorio, 1) AS notif_recordatorio
        FROM usuarios
        WHERE id = ?
        LIMIT 1`,
@@ -1138,6 +1163,10 @@ app.get('/api/me', requireAuth, async (req, res) => {
 app.put('/api/me', requireAuth, async (req, res) => {
   const emailNormalizado = normalizeEmail(req.body?.email);
   const notificarEmail = req.body?.notificar_email !== false;
+  const notifNuevoComunicado = req.body?.notif_nuevo_comunicado !== false;
+  const notifReconfirmacion = req.body?.notif_reconfirmacion !== false;
+  const notifRecordatorio = req.body?.notif_recordatorio !== false;
+  const avatarUrl = String(req.body?.avatar_url || '').trim() || null;
 
   if (emailNormalizado && !isValidEmail(emailNormalizado)) {
     return res.status(400).json({ success: false, message: 'Correo electronico invalido' });
@@ -1155,8 +1184,23 @@ app.put('/api/me', requireAuth, async (req, res) => {
     }
 
     await db.query(
-      'UPDATE usuarios SET email = ?, notificar_email = ? WHERE id = ?',
-      [emailNormalizado || null, notificarEmail ? 1 : 0, req.user.id]
+      `UPDATE usuarios
+       SET email = ?,
+           notificar_email = ?,
+           avatar_url = ?,
+           notif_nuevo_comunicado = ?,
+           notif_reconfirmacion = ?,
+           notif_recordatorio = ?
+       WHERE id = ?`,
+      [
+        emailNormalizado || null,
+        notificarEmail ? 1 : 0,
+        avatarUrl,
+        notifNuevoComunicado ? 1 : 0,
+        notifReconfirmacion ? 1 : 0,
+        notifRecordatorio ? 1 : 0,
+        req.user.id
+      ]
     );
 
     await logAudit({
@@ -1164,12 +1208,23 @@ app.put('/api/me', requireAuth, async (req, res) => {
       action: 'profile.update',
       entity: 'user',
       entityId: Number(req.user.id),
-      metadata: { notificar_email: notificarEmail ? 1 : 0 },
+      metadata: {
+        notificar_email: notificarEmail ? 1 : 0,
+        notif_nuevo_comunicado: notifNuevoComunicado ? 1 : 0,
+        notif_reconfirmacion: notifReconfirmacion ? 1 : 0,
+        notif_recordatorio: notifRecordatorio ? 1 : 0,
+        avatar_url: avatarUrl
+      },
       req
     });
 
     const [rows] = await db.query(
-      `SELECT id, nombre_completo, area, rol, email, COALESCE(notificar_email, 1) AS notificar_email
+      `SELECT id, nombre_completo, area, rol, email,
+              COALESCE(notificar_email, 1) AS notificar_email,
+              avatar_url,
+              COALESCE(notif_nuevo_comunicado, 1) AS notif_nuevo_comunicado,
+              COALESCE(notif_reconfirmacion, 1) AS notif_reconfirmacion,
+              COALESCE(notif_recordatorio, 1) AS notif_recordatorio
        FROM usuarios
        WHERE id = ?
        LIMIT 1`,
@@ -1771,6 +1826,7 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
         END AS publicacion, 
         r.fecha_lectura,
         r.tipo_confirmacion,
+        pr.reaccion AS reaccion_usuario,
         COALESCE(rx.util, 0) AS reaccion_util,
         COALESCE(rx.importante, 0) AS reaccion_importante,
         COALESCE(rx.me_gusta, 0) AS reaccion_me_gusta,
@@ -1782,6 +1838,9 @@ app.get('/api/reportes', requireAuth, requireAdmin, async (req, res) => {
       FROM registro_lecturas r
       INNER JOIN usuarios u ON r.usuario_id = u.id
       LEFT JOIN publicaciones p ON r.publicacion_id = p.id
+      LEFT JOIN publicacion_reacciones pr
+        ON pr.publicacion_id = r.publicacion_id
+       AND pr.usuario_id = r.usuario_id
       LEFT JOIN (
         SELECT
           publicacion_id,

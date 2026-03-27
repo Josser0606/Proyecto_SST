@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FiBarChart2, FiCheckCircle, FiEye, FiFile, FiFileText, FiHeart, FiImage, FiLink2, FiMapPin, FiMonitor, FiPaperclip, FiRefreshCw, FiThumbsUp, FiType, FiUpload, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
+import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 
 const CATEGORIAS = [
   'SST y GH',
@@ -77,7 +78,7 @@ function AdminPanel() {
   const [refreshingTitulos, setRefreshingTitulos] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
-  const navigate = useNavigate();
+  const navigateBase = useNavigate();
   const usuario = JSON.parse(localStorage.getItem('usuario'));
   const tieneCambiosSinGuardar = useMemo(() => {
     return Boolean(
@@ -89,6 +90,14 @@ function AdminPanel() {
       links.some((link) => link.trim())
     );
   }, [titulo, contenido, categoria, imagenesInputs, archivosInputs, links]);
+  const { confirmIfNeeded } = useUnsavedChangesPrompt(
+    tieneCambiosSinGuardar && !loading,
+    'Tienes un comunicado en edicion. ¿Seguro que deseas salir sin guardar los cambios?'
+  );
+  const navigate = useCallback((to, options) => {
+    if (!confirmIfNeeded()) return;
+    navigateBase(to, options);
+  }, [confirmIfNeeded, navigateBase]);
   const toggleDarkMode = () => {
     const next = !darkMode;
     setDarkMode(next);
@@ -225,16 +234,6 @@ function AdminPanel() {
     setTituloSeed((prev) => prev + 1);
     setTimeout(() => setRefreshingTitulos(false), 380);
   };
-
-  useEffect(() => {
-    if (!tieneCambiosSinGuardar || loading) return undefined;
-    const handleBeforeUnload = (event) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [tieneCambiosSinGuardar, loading]);
 
   useEffect(() => {
     if (!previewOpen) {

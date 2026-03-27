@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBell, FiCheckCircle, FiClock, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiStar, FiThumbsUp, FiTrash2, FiUpload, FiUser, FiX, FiZap } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiClock, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiMoon, FiStar, FiSun, FiThumbsUp, FiTrash2, FiUpload, FiUser, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
+import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 
 const CATEGORIAS = [
   'Todas',
@@ -50,6 +51,7 @@ function Dashboard() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileViewsOpen, setMobileViewsOpen] = useState(false);
   const [searchScopes] = useState({
     titulo: true,
     contenido: true,
@@ -74,7 +76,14 @@ function Dashboard() {
   const [cargandoComentarios, setCargandoComentarios] = useState({});
   const [miPerfil, setMiPerfil] = useState(null);
   const [perfilOpen, setPerfilOpen] = useState(false);
-  const [perfilForm, setPerfilForm] = useState({ email: '', notificar_email: true });
+  const [perfilForm, setPerfilForm] = useState({
+    email: '',
+    avatar_url: '',
+    notificar_email: true,
+    notif_nuevo_comunicado: true,
+    notif_reconfirmacion: true,
+    notif_recordatorio: true
+  });
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
@@ -96,10 +105,15 @@ function Dashboard() {
       return null;
     }
   }, []);
-  const navigate = useNavigate();
+  const navigateBase = useNavigate();
   const cargandoPublicacionesRef = useRef(false);
   const notificationPanelRef = useRef(null);
   const editSnapshotRef = useRef(null);
+  const hasUnsavedChangesRef = useRef(false);
+  const navigate = useCallback((to, options) => {
+    if (hasUnsavedChangesRef.current && !window.confirm('Tienes cambios sin guardar. ¿Seguro que deseas salir de esta vista?')) return;
+    navigateBase(to, options);
+  }, [navigateBase]);
   const REACCIONES_DISPONIBLES = [
     { key: 'util', label: 'Util', icon: FiThumbsUp },
     { key: 'importante', label: 'Importante', icon: FiZap },
@@ -133,6 +147,15 @@ function Dashboard() {
     }
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [notificationsOpen]);
+
+  useEffect(() => {
+    const closeMobileMenus = () => {
+      setMobileFiltersOpen(false);
+      setMobileViewsOpen(false);
+    };
+    window.addEventListener('resize', closeMobileMenus);
+    return () => window.removeEventListener('resize', closeMobileMenus);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -186,7 +209,11 @@ function Dashboard() {
         setMiPerfil(data.usuario);
         setPerfilForm({
           email: data.usuario.email || '',
-          notificar_email: Number(data.usuario.notificar_email) !== 0
+          avatar_url: data.usuario.avatar_url || '',
+          notificar_email: Number(data.usuario.notificar_email) !== 0,
+          notif_nuevo_comunicado: Number(data.usuario.notif_nuevo_comunicado) !== 0,
+          notif_reconfirmacion: Number(data.usuario.notif_reconfirmacion) !== 0,
+          notif_recordatorio: Number(data.usuario.notif_recordatorio) !== 0
         });
       }
     } catch {
@@ -234,16 +261,25 @@ function Dashboard() {
       !linksEqual
     );
   }, [editandoId, formEdit]);
-
+  const tieneCambiosPerfil = useMemo(() => {
+    if (!perfilOpen || !miPerfil) return false;
+    return (
+      String(perfilForm.email || '').trim() !== String(miPerfil.email || '').trim() ||
+      String(perfilForm.avatar_url || '').trim() !== String(miPerfil.avatar_url || '').trim() ||
+      Boolean(perfilForm.notificar_email) !== (Number(miPerfil.notificar_email) !== 0) ||
+      Boolean(perfilForm.notif_nuevo_comunicado) !== (Number(miPerfil.notif_nuevo_comunicado) !== 0) ||
+      Boolean(perfilForm.notif_reconfirmacion) !== (Number(miPerfil.notif_reconfirmacion) !== 0) ||
+      Boolean(perfilForm.notif_recordatorio) !== (Number(miPerfil.notif_recordatorio) !== 0)
+    );
+  }, [miPerfil, perfilForm, perfilOpen]);
+  const hayCambiosSinGuardar = (tieneCambiosEdicion || tieneCambiosPerfil) && !guardandoPerfil;
   useEffect(() => {
-    if (!tieneCambiosEdicion) return undefined;
-    const handleBeforeUnload = (event) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [tieneCambiosEdicion]);
+    hasUnsavedChangesRef.current = hayCambiosSinGuardar;
+  }, [hayCambiosSinGuardar]);
+  const { confirmIfNeeded } = useUnsavedChangesPrompt(
+    hayCambiosSinGuardar,
+    'Tienes cambios sin guardar. ¿Seguro que deseas salir de esta vista?'
+  );
 
   const showResumen = panelAbierto === 'resumen';
   const showActividad = panelAbierto === 'actividad';
@@ -329,6 +365,7 @@ function Dashboard() {
   };
 
   const activarEdicion = (pub) => {
+    if (tieneCambiosEdicion && !confirmIfNeeded()) return;
     const recursosBase = (pub.recursos || []).map((r) => ({ id: r.id, tipo: r.tipo, nombre: r.nombre, url: r.url }));
     editSnapshotRef.current = {
       titulo: pub.titulo || '',
@@ -349,6 +386,16 @@ function Dashboard() {
       recursosExistentes: recursosBase,
       linksNuevos: ['']
     });
+  };
+  const cerrarEdicion = () => {
+    if (tieneCambiosEdicion && !confirmIfNeeded()) return;
+    editSnapshotRef.current = null;
+    setEditandoId(null);
+  };
+
+  const cerrarPerfil = () => {
+    if (tieneCambiosPerfil && !confirmIfNeeded()) return;
+    setPerfilOpen(false);
   };
 
   const quitarRecursoExistente = (id) => {
@@ -490,7 +537,11 @@ function Dashboard() {
     try {
       const payload = {
         email: perfilForm.email,
-        notificar_email: Boolean(perfilForm.notificar_email)
+        avatar_url: perfilForm.avatar_url,
+        notificar_email: Boolean(perfilForm.notificar_email),
+        notif_nuevo_comunicado: Boolean(perfilForm.notif_nuevo_comunicado),
+        notif_reconfirmacion: Boolean(perfilForm.notif_reconfirmacion),
+        notif_recordatorio: Boolean(perfilForm.notif_recordatorio)
       };
       const { data } = await axios.put(apiUrl('/api/me'), payload);
       if (data?.usuario) {
@@ -675,16 +726,16 @@ function Dashboard() {
 
   return (
     <div className={`min-h-screen flex flex-col overflow-x-hidden transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-gray-50 text-slate-900'}`}>
-      <nav className={`px-3 sm:px-6 py-2.5 flex justify-between items-center fixed top-0 left-0 right-0 z-50 border-b transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-200 shadow-sm'}`}>
+      <nav className={`px-2.5 sm:px-6 py-2.5 flex justify-between items-center fixed top-0 left-0 right-0 z-50 border-b transition-colors ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-200 shadow-sm'}`}>
         <div className="absolute bottom-0 left-0 h-[3px] bg-green-500 transition-all duration-150" style={{ width: `${scrollProgress}%` }}></div>
         <img
           src={logoSaciar}
           alt="Logo"
           onClick={() => navigate('/dashboard')}
-          className={`h-11 sm:h-14 w-auto object-contain cursor-pointer ${darkMode ? 'brightness-125' : ''}`}
+          className={`h-10 sm:h-14 w-auto object-contain cursor-pointer ${darkMode ? 'brightness-125' : ''}`}
           title="Ir al dashboard"
         />
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-4">
           <div className="relative" ref={notificationPanelRef}>
             <button
               onClick={() => setNotificationsOpen((prev) => !prev)}
@@ -701,7 +752,7 @@ function Dashboard() {
               )}
             </button>
             {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-[300px] sm:w-[360px] rounded-2xl border p-3 shadow-2xl z-[60] ${
+              <div className={`absolute right-0 mt-2 w-[min(360px,calc(100vw-1rem))] rounded-2xl border p-3 shadow-2xl z-[60] ${
                 darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
               }`}>
                 <div className="flex items-center justify-between gap-2 mb-2">
@@ -747,8 +798,13 @@ function Dashboard() {
               </div>
             )}
           </div>
-          <button onClick={toggleDarkMode} className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}>
-            {darkMode ? 'Claro' : 'Oscuro'}
+          <button
+            onClick={toggleDarkMode}
+            className={`p-2.5 rounded-xl transition-all inline-flex items-center justify-center ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}
+            title={darkMode ? 'Modo claro' : 'Modo oscuro'}
+          >
+            {darkMode ? <FiSun className="w-5 h-5" /> : <FiMoon className="w-5 h-5" />}
+            <span className="sr-only">{darkMode ? 'Claro' : 'Oscuro'}</span>
           </button>
           <button
             onClick={() => setPerfilOpen(true)}
@@ -950,76 +1006,119 @@ function Dashboard() {
           )}
         </aside>
 
-        <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
+        <main className={`flex-1 min-w-0 p-3 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
           <div className="max-w-6xl mx-auto">
-          <div className="lg:hidden mb-4 space-y-3">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setMobileFiltersOpen((prev) => !prev)}
-                className={`w-12 h-12 rounded-xl border transition-all flex items-center justify-center ${
-                  darkMode
-                    ? 'bg-slate-900 border-slate-700 text-slate-200'
-                    : 'bg-white border-gray-200 text-slate-600'
-                }`}
-                aria-label="Abrir categorias"
-                title="Categorias"
-              >
-                <svg className={`w-5 h-5 transition-transform ${mobileFiltersOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16"></path>
-                </svg>
-                <span className="sr-only">Categorias</span>
-              </button>
+          <div className="lg:hidden mb-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileFiltersOpen((prev) => !prev);
+                    setMobileViewsOpen(false);
+                  }}
+                  className={`w-12 h-12 rounded-xl border transition-all flex items-center justify-center ${
+                    darkMode
+                      ? 'bg-slate-900 border-slate-700 text-slate-200'
+                      : 'bg-white border-gray-200 text-slate-600'
+                  }`}
+                  aria-label="Abrir categorias"
+                  title="Categorias"
+                >
+                  <svg className={`w-5 h-5 transition-transform ${mobileFiltersOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16"></path>
+                  </svg>
+                  <span className="sr-only">Categorias</span>
+                </button>
 
-              {mobileFiltersOpen && (
-                <div className={`mt-2 rounded-2xl border p-2 shadow-lg absolute left-0 z-30 w-[240px] ${
-                  darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
-                }`}>
-                  <div className={`max-h-56 overflow-y-auto sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
-                    {CATEGORIAS.map((cat) => (
-                      <button
-                        key={`mobile-${cat}`}
-                        onClick={() => {
-                          setCategoriaFiltro(cat);
-                          setMobileFiltersOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black transition-all ${
-                          categoriaFiltro === cat
-                            ? 'bg-green-600 text-white'
-                            : darkMode
-                              ? 'text-slate-200 hover:bg-slate-800'
-                              : 'text-slate-600 hover:bg-green-50'
-                        }`}
-                      >
-                        {cat}
-                      </button>
-                    ))}
+                {mobileFiltersOpen && (
+                  <div className={`mt-2 rounded-2xl border p-2 shadow-lg absolute left-0 z-30 w-[240px] ${
+                    darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
+                  }`}>
+                    <div className={`max-h-56 overflow-y-auto sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
+                      {CATEGORIAS.map((cat) => (
+                        <button
+                          key={`mobile-${cat}`}
+                          onClick={() => {
+                            setCategoriaFiltro(cat);
+                            setMobileFiltersOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black transition-all ${
+                            categoriaFiltro === cat
+                              ? 'bg-green-600 text-white'
+                              : darkMode
+                                ? 'text-slate-200 hover:bg-slate-800'
+                                : 'text-slate-600 hover:bg-green-50'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                )}
+              </div>
+
+              {usuario?.rol === 'admin' && (
+                <div className="relative ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileViewsOpen((prev) => !prev);
+                      setMobileFiltersOpen(false);
+                    }}
+                    className={`w-12 h-12 rounded-xl border transition-all flex items-center justify-center ${
+                      darkMode
+                        ? 'bg-slate-900 border-slate-700 text-slate-200'
+                        : 'bg-white border-gray-200 text-slate-600'
+                    }`}
+                    aria-label="Abrir menu"
+                    title="Menu"
+                  >
+                    <svg className={`w-5 h-5 transition-transform ${mobileViewsOpen ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                    <span className="sr-only">Menu</span>
+                  </button>
+
+                  {mobileViewsOpen && (
+                    <div className={`mt-2 rounded-2xl border p-2 shadow-lg absolute right-0 z-30 w-[220px] ${
+                      darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
+                    }`}>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: 'Inicio', to: '/dashboard' },
+                          { label: 'Crear', to: '/admin' },
+                          { label: 'Empleados', to: '/registro-personal' },
+                          { label: 'Auditoria', to: '/reportes' },
+                          { label: 'Panel', to: '/reportes-panel' }
+                        ].map((item) => (
+                          <button
+                            key={item.to}
+                            onClick={() => {
+                              navigate(item.to);
+                              setMobileViewsOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-black border transition ${
+                              item.to === '/dashboard'
+                                ? 'bg-green-600 border-green-600 text-white'
+                                : darkMode
+                                  ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            {usuario?.rol === 'admin' && (
-              <div className="grid grid-cols-5 gap-2">
-                <button onClick={() => navigate('/dashboard')} className="px-3 py-2 rounded-xl bg-green-600 text-white text-xs font-black">
-                  Inicio
-                </button>
-                <button onClick={() => navigate('/admin')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-                  Crear
-                </button>
-                <button onClick={() => navigate('/registro-personal')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-                  Empleados
-                </button>
-                <button onClick={() => navigate('/reportes')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-                  Auditoria
-                </button>
-                <button onClick={() => navigate('/reportes-panel')} className={`px-3 py-2 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-                  Panel
-                </button>
-              </div>
-            )}
           </div>
 
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+          <div className="mb-4 grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
             <section className={`rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-100 shadow-sm'}`}>
               <button
                 type="button"
@@ -1045,7 +1144,7 @@ function Dashboard() {
                   showResumen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
-                <div className="grid grid-cols-3 gap-2 px-3 pb-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-3 pb-3 pt-1">
                   <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Total</p>
                     <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalPublicaciones}</p>
@@ -1088,7 +1187,7 @@ function Dashboard() {
                 }`}
               >
                 <div className="space-y-2 px-3 pb-3 pt-1">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Leidos</p>
                       <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
@@ -1148,8 +1247,8 @@ function Dashboard() {
                 </button>
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setSoloFavoritos((prev) => !prev)}
@@ -1168,7 +1267,7 @@ function Dashboard() {
                 Resultados ordenados por relevancia.
                 </p>
               </div>
-              <p className={`text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              <p className={`text-[11px] font-semibold self-end sm:self-auto ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                 {publicacionesFiltradas.length} resultado(s)
               </p>
             </div>
@@ -1176,7 +1275,7 @@ function Dashboard() {
 
           <div className="space-y-8">
             {publicacionesFiltradas.length === 0 && (
-              <article className={`rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden border transition-all duration-300 p-6 sm:p-10 text-center ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
+              <article className={`rounded-2xl sm:rounded-[2.5rem] overflow-hidden border transition-all duration-300 p-5 sm:p-10 text-center ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
                 <h3 className="text-xl sm:text-2xl font-black mb-2">No hay comunicados para mostrar</h3>
                 <p className={`${darkMode ? 'text-slate-400' : 'text-slate-500'} mb-6`}>
                   Publica uno nuevo o ajusta los filtros para ver resultados.
@@ -1204,14 +1303,14 @@ function Dashboard() {
                     ? 'Reconfirmar lectura'
                     : 'Confirmar lectura';
               return (
-              <article key={pub.id} className={`rounded-[2.2rem] overflow-hidden border transition-all duration-300 hover:-translate-y-[1px] ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
+              <article key={pub.id} className={`rounded-2xl sm:rounded-[2.2rem] overflow-hidden border transition-all duration-300 hover:-translate-y-[1px] ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-gray-100 shadow-xl shadow-slate-200/50'}`}>
                 {pub.imagen_url && (
                   <div className={`w-full flex justify-center p-4 sm:p-8 border-b ${darkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-gray-50'}`}>
-                    <img src={assetUrl(pub.imagen_url)} alt="Comunicado" className="max-w-full h-auto max-h-[85vh] rounded-2xl shadow-2xl object-contain transition-transform duration-500 hover:scale-[1.01]" />
+                    <img src={assetUrl(pub.imagen_url)} alt="Comunicado" className="max-w-full h-auto max-h-[60vh] sm:max-h-[85vh] rounded-xl sm:rounded-2xl shadow-2xl object-contain transition-transform duration-500 hover:scale-[1.01]" />
                   </div>
                 )}
 
-                <div className="p-5 sm:p-8 lg:p-10">
+                <div className="p-4 sm:p-8 lg:p-10">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-2">
                     <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-lg ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-50 text-green-700'}`}>{pub.categoria}</span>
                     <span className="text-[11px] text-slate-400 font-bold">{new Date(pub.fecha_publicacion).toLocaleDateString()}</span>
@@ -1334,7 +1433,7 @@ function Dashboard() {
                         <p className={`text-xs font-bold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Recursos actuales (quitar para eliminar)</p>
                         <div className="flex flex-wrap gap-2">
                           {formEdit.recursosExistentes.map((r) => (
-                            <button key={r.id} type="button" onClick={() => quitarRecursoExistente(r.id)} className={`text-xs px-3 py-1.5 rounded-full border hover:border-red-300 hover:text-red-600 ${
+                            <button key={r.id} type="button" onClick={() => quitarRecursoExistente(r.id)} className={`text-xs px-3 py-1.5 rounded-full border hover:border-red-300 hover:text-red-600 text-left max-w-full break-all [overflow-wrap:anywhere] ${
                               darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200'
                             }`}>
                               {r.tipo === 'archivo' ? 'Archivo: ' : 'Link: '}{r.nombre} x
@@ -1368,7 +1467,7 @@ function Dashboard() {
                           <FiCheckCircle className="w-4 h-4" />
                           Guardar cambios
                         </button>
-                        <button onClick={() => { editSnapshotRef.current = null; setEditandoId(null); }} className={`px-4 py-2.5 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-white'}`}>
+                        <button onClick={cerrarEdicion} className={`px-4 py-2.5 rounded-xl text-xs font-black border ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-white'}`}>
                           Cancelar
                         </button>
                       </div>
@@ -1396,8 +1495,12 @@ function Dashboard() {
                           <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Recursos adjuntos</p>
                           <div className="flex flex-wrap gap-2">
                             {otrosRecursos.map((r) => (
-                              <a key={r.id} href={r.tipo === 'archivo' ? assetUrl(r.url) : r.url} target="_blank" rel="noreferrer" className={`px-3 py-2 rounded-lg text-xs font-bold border hover:border-green-300 hover:text-green-700 ${
-                                darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200'
+                              <a key={r.id} href={r.tipo === 'archivo' ? assetUrl(r.url) : r.url} target="_blank" rel="noreferrer" className={`px-3 py-2 rounded-lg text-xs font-bold border hover:border-green-300 hover:text-green-700 max-w-full break-all [overflow-wrap:anywhere] inline-block ${
+                                r.tipo === 'link'
+                                  ? (darkMode
+                                    ? 'bg-green-900/25 border-green-700 text-green-300 md:bg-slate-900 md:border-slate-700 md:text-slate-200'
+                                    : 'bg-green-50 border-green-300 text-green-700 md:bg-white md:border-slate-200 md:text-slate-700')
+                                  : (darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200')
                               }`}>
                                 {r.tipo === 'archivo' ? 'Archivo' : 'Link'}: {r.nombre}
                               </a>
@@ -1463,7 +1566,7 @@ function Dashboard() {
                             {comentariosOpen[pub.id] ? 'Ocultar' : 'Ver'} ({Number(pub.comentarios_total || 0)})
                           </button>
                         </div>
-                        <div className="flex gap-2 mb-2">
+                        <div className="flex flex-col sm:flex-row gap-2 mb-2">
                           <input
                             type="text"
                             value={comentarioDraft[pub.id] || ''}
@@ -1482,7 +1585,7 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => enviarComentario(pub.id)}
-                            className="px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-black"
+                            className="px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-black sm:w-auto w-full"
                           >
                             Enviar
                           </button>
@@ -1511,11 +1614,11 @@ function Dashboard() {
                   )}
 
                   <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-8 border-t ${darkMode ? 'border-slate-800' : 'border-gray-100'}`}>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                       <button
                         onClick={() => !leidoVigente && !bloqueoPorPlazo && marcarComoLeido(pub.id, requiereReconfirmacion)}
                         disabled={leidoVigente || bloqueoPorPlazo}
-                        className={`px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        className={`px-6 sm:px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto ${
                           leidoVigente || bloqueoPorPlazo
                             ? (darkMode ? 'bg-slate-800 text-slate-500' : 'bg-gray-50 text-slate-300')
                             : 'bg-green-600 text-white shadow-xl hover:bg-green-700 hover:-translate-y-1'
@@ -1527,7 +1630,7 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={() => toggleFavorito(pub.id, Boolean(pub.favorito_usuario))}
-                        className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl border text-xs font-black transition ${
+                        className={`inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-xs font-black transition w-full sm:w-auto ${
                           pub.favorito_usuario
                             ? 'bg-amber-500 text-white border-amber-500'
                             : darkMode
@@ -1582,42 +1685,96 @@ function Dashboard() {
               <h3 className={`text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi perfil</h3>
               <button
                 type="button"
-                onClick={() => setPerfilOpen(false)}
+                onClick={cerrarPerfil}
                 className={`w-8 h-8 rounded-lg border flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-white text-slate-500'}`}
               >
                 <FiX className="w-4 h-4" />
               </button>
             </div>
             <div className="space-y-3">
-              <div>
-                <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Nombre</p>
-                <div className={`px-3 py-2 rounded-lg border text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-                  {miPerfil?.nombre_completo || usuario?.nombre_completo}
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50'}`}>
+                <p className={`text-[10px] font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>General</p>
+                <div className="grid grid-cols-[56px_1fr] gap-3 items-center mb-3">
+                  <div className={`w-14 h-14 rounded-xl overflow-hidden border ${darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-300 bg-white'}`}>
+                    {perfilForm.avatar_url ? (
+                      <img src={perfilForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-lg font-black text-slate-400">
+                        {(miPerfil?.nombre_completo || usuario?.nombre_completo || 'U').slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    <p className="font-black text-sm">{miPerfil?.nombre_completo || usuario?.nombre_completo}</p>
+                    <p className="uppercase tracking-wider text-[10px]">{miPerfil?.area || usuario?.area}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Correo</p>
+                    <input
+                      type="email"
+                      value={perfilForm.email}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="correo@empresa.com"
+                      className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                    />
+                  </div>
+                  <div>
+                    <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Avatar (URL)</p>
+                    <input
+                      type="url"
+                      value={perfilForm.avatar_url}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, avatar_url: e.target.value }))}
+                      placeholder="https://..."
+                      className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
+                    />
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className={`text-[11px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Correo</p>
-                <input
-                  type="email"
-                  value={perfilForm.email}
-                  onChange={(e) => setPerfilForm((prev) => ({ ...prev, email: e.target.value }))}
-                  placeholder="correo@empresa.com"
-                  className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
-                />
+
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50'}`}>
+                <p className={`text-[10px] font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Notificaciones</p>
+                <div className="space-y-2">
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <span>Habilitar correo</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(perfilForm.notificar_email)}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, notificar_email: e.target.checked }))}
+                    />
+                  </label>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <span>Nuevos comunicados</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(perfilForm.notif_nuevo_comunicado)}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, notif_nuevo_comunicado: e.target.checked }))}
+                    />
+                  </label>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <span>Reconfirmaciones</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(perfilForm.notif_reconfirmacion)}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, notif_reconfirmacion: e.target.checked }))}
+                    />
+                  </label>
+                  <label className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <span>Recordatorios</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(perfilForm.notif_recordatorio)}
+                      onChange={(e) => setPerfilForm((prev) => ({ ...prev, notif_recordatorio: e.target.checked }))}
+                    />
+                  </label>
+                </div>
               </div>
-              <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(perfilForm.notificar_email)}
-                  onChange={(e) => setPerfilForm((prev) => ({ ...prev, notificar_email: e.target.checked }))}
-                />
-                Recibir notificaciones por correo
-              </label>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setPerfilOpen(false)}
+                onClick={cerrarPerfil}
                 className={`px-3 py-2 rounded-lg border text-xs font-black ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
               >
                 Cancelar

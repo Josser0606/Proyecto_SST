@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { FiEye, FiEyeOff } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png'; 
 import { apiUrl, setAuthToken } from '../config/api';
+import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 
 function Login() {
   const [nombre, setNombre] = useState('');
@@ -15,6 +16,11 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false); // Estado para el modal
   const navigate = useNavigate();
+  const tieneCambiosIngreso = Boolean(nombre.trim() || password.trim() || pedirPass || mostrarConfirmacion);
+  const { confirmIfNeeded } = useUnsavedChangesPrompt(
+    tieneCambiosIngreso && !loading,
+    'Tienes datos de ingreso sin completar. ¿Seguro que deseas salir?'
+  );
 
   useEffect(() => {
     toast.dismiss();
@@ -148,7 +154,10 @@ function Login() {
           <img
             src={logoSaciar}
             alt="Logo Saciar"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              if (!confirmIfNeeded()) return;
+              navigate('/dashboard');
+            }}
             className="h-28 sm:h-36 md:h-44 w-auto object-contain cursor-pointer"
             title="Ir al dashboard"
           />

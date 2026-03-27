@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FiSliders } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
+import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 
 const AREAS = [
   'SST y GH',
@@ -28,6 +30,8 @@ const BASE_FORM = {
 function RegistroEmpleado() {
   const [usuarios, setUsuarios] = useState([]);
   const [filtro, setFiltro] = useState('');
+  const [filtroArea, setFiltroArea] = useState('Todas');
+  const [areaFilterOpen, setAreaFilterOpen] = useState(false);
   const [formData, setFormData] = useState(BASE_FORM);
   const [editandoId, setEditandoId] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -36,17 +40,31 @@ function RegistroEmpleado() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true');
   const formRef = useRef(null);
   const formSnapshotRef = useRef(BASE_FORM);
-  const navigate = useNavigate();
+  const areaFilterRef = useRef(null);
+  const navigateBase = useNavigate();
+  const hasUnsavedChangesRef = useRef(false);
+  const navigate = useCallback((to, options) => {
+    if (hasUnsavedChangesRef.current && !window.confirm('Tienes cambios sin guardar en el formulario de empleado. ¿Seguro que deseas salir?')) return;
+    navigateBase(to, options);
+  }, [navigateBase]);
 
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
+  const cargarUsuarios = useCallback(async () => {
+    try {
+      const { data } = await axios.get(apiUrl('/api/usuarios'));
+      setUsuarios(data);
+    } catch {
+      toast.error('No fue posible cargar empleados');
+    }
+  }, []);
 
   useEffect(() => {
     if (usuarioActual?.rol !== 'admin') {
       navigate('/dashboard');
       return;
     }
-    cargarUsuarios();
-  }, []);
+    void cargarUsuarios();
+  }, [usuarioActual?.rol, navigate, cargarUsuarios]);
 
   useEffect(() => {
     if (!formOpen) return undefined;
@@ -56,6 +74,17 @@ function RegistroEmpleado() {
       document.body.style.overflow = prevOverflow;
     };
   }, [formOpen]);
+
+  useEffect(() => {
+    const handleOutside = (event) => {
+      if (!areaFilterRef.current) return;
+      if (!areaFilterRef.current.contains(event.target)) {
+        setAreaFilterOpen(false);
+      }
+    };
+    if (areaFilterOpen) document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [areaFilterOpen]);
 
   const tieneCambiosFormulario = useMemo(() => {
     if (!formOpen) return false;
@@ -69,25 +98,13 @@ function RegistroEmpleado() {
       Boolean(formData.notificar_email) !== Boolean(snap.notificar_email)
     );
   }, [formData, formOpen]);
-
+  const { confirmIfNeeded } = useUnsavedChangesPrompt(
+    tieneCambiosFormulario && !loading,
+    'Tienes cambios sin guardar en el formulario de empleado. ¿Seguro que deseas salir?'
+  );
   useEffect(() => {
-    if (!tieneCambiosFormulario || loading) return undefined;
-    const handleBeforeUnload = (event) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    hasUnsavedChangesRef.current = tieneCambiosFormulario && !loading;
   }, [tieneCambiosFormulario, loading]);
-
-  const cargarUsuarios = async () => {
-    try {
-      const { data } = await axios.get(apiUrl('/api/usuarios'));
-      setUsuarios(data);
-    } catch {
-      toast.error('No fue posible cargar empleados');
-    }
-  };
 
   const limpiarFormulario = () => {
     setFormData(BASE_FORM);
@@ -95,9 +112,11 @@ function RegistroEmpleado() {
     formSnapshotRef.current = BASE_FORM;
   };
 
-  const cerrarFormulario = () => {
+  const cerrarFormulario = (force = false) => {
+    if (force !== true && !confirmIfNeeded()) return false;
     limpiarFormulario();
     setFormOpen(false);
+    return true;
   };
 
   const validarFormulario = () => {
@@ -146,7 +165,7 @@ function RegistroEmpleado() {
         toast.success('Empleado agregado');
       }
 
-      cerrarFormulario();
+      cerrarFormulario(true);
       cargarUsuarios();
     } catch (error) {
       const mensaje = error.response?.data?.message || 'No fue posible guardar';
@@ -157,6 +176,7 @@ function RegistroEmpleado() {
   };
 
   const editarUsuario = (usuario) => {
+    if (formOpen && tieneCambiosFormulario && !confirmIfNeeded()) return;
     const snapshot = {
       nombre_completo: usuario.nombre_completo || '',
       area: usuario.area || 'SST y GH',
@@ -219,8 +239,9 @@ function RegistroEmpleado() {
 
   const usuariosFiltrados = useMemo(() => {
     const term = filtro.toLowerCase().trim();
-    if (!term) return usuarios;
     return usuarios.filter((u) => {
+      if (filtroArea !== 'Todas' && (u.area || '') !== filtroArea) return false;
+      if (!term) return true;
       return (
         (u.nombre_completo || '').toLowerCase().includes(term) ||
         (u.area || '').toLowerCase().includes(term) ||
@@ -228,7 +249,7 @@ function RegistroEmpleado() {
         (u.email || '').toLowerCase().includes(term)
       );
     });
-  }, [usuarios, filtro]);
+  }, [usuarios, filtro, filtroArea]);
 
   const totalAdmins = useMemo(() => usuarios.filter((u) => u.rol === 'admin').length, [usuarios]);
   const toggleSidebar = () => {
@@ -615,6 +636,56 @@ function RegistroEmpleado() {
                   </p>
                 </div>
                 <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <div className="w-full sm:w-auto relative" ref={areaFilterRef}>
+                    <button
+                      type="button"
+                      onClick={() => setAreaFilterOpen((prev) => !prev)}
+                      className={`h-[46px] w-[84px] sm:w-[90px] min-w-[84px] px-0 rounded-xl border flex items-center justify-center transition ${
+                        darkMode
+                          ? 'border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700'
+                          : 'border-gray-200 bg-gray-50 text-slate-700 hover:bg-white'
+                      }`}
+                      title="Filtrar por area"
+                    >
+                      <FiSliders className={`${filtroArea !== 'Todas' ? 'text-green-600' : (darkMode ? 'text-slate-300' : 'text-slate-500')}`} />
+                    </button>
+
+                    {areaFilterOpen && (
+                      <div className={`absolute top-[52px] left-0 right-0 sm:right-auto z-30 w-[min(86vw,260px)] rounded-2xl border shadow-xl p-3 ${
+                        darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+                      }`}>
+                        <p className={`text-[10px] font-black uppercase tracking-widest mb-2 ${
+                          darkMode ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
+                          Filtrar por area
+                        </p>
+                        <div className={`filter-scroll max-h-60 overflow-auto pr-1 space-y-1 ${darkMode ? 'filter-scroll-dark' : ''}`}>
+                          {['Todas', ...AREAS].map((area) => {
+                            const active = filtroArea === area;
+                            return (
+                              <button
+                                key={`filtro-${area}`}
+                                type="button"
+                                onClick={() => {
+                                  setFiltroArea(area);
+                                  setAreaFilterOpen(false);
+                                }}
+                                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                                  active
+                                    ? 'bg-green-600 text-white border-green-600'
+                                    : darkMode
+                                      ? 'border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700'
+                                      : 'border-gray-200 bg-gray-50 text-slate-700 hover:bg-white'
+                                }`}
+                              >
+                                {area === 'Todas' ? 'Todas las areas' : area}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                   <div className="w-full sm:w-[340px]">
                     <label className="sr-only" htmlFor="buscar-empleado">Busqueda</label>
                     <input
@@ -628,10 +699,13 @@ function RegistroEmpleado() {
                       }`}
                     />
                   </div>
-                  {!!filtro && (
+                  {(!!filtro || filtroArea !== 'Todas') && (
                     <button
                       type="button"
-                      onClick={() => setFiltro('')}
+                      onClick={() => {
+                        setFiltro('');
+                        setFiltroArea('Todas');
+                      }}
                       className="px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border border-green-200 text-green-700 hover:bg-green-50"
                     >
                       Limpiar
@@ -685,13 +759,17 @@ function RegistroEmpleado() {
                       }`}>
                         {u.area}
                       </span>
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                        u.rol === 'admin' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+                      <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                        u.rol === 'admin'
+                          ? (darkMode ? 'bg-red-950/50 text-red-200 border-red-800' : 'bg-red-50 text-red-600 border-red-200')
+                          : (darkMode ? 'bg-green-950/40 text-green-200 border-green-800' : 'bg-green-50 text-green-700 border-green-200')
                       }`}>
                         {u.rol}
                       </span>
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                        u.notificar_email ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                        u.notificar_email
+                          ? (darkMode ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                          : (darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200')
                       }`}>
                         {u.notificar_email ? 'Email on' : 'Email off'}
                       </span>
@@ -735,7 +813,7 @@ function RegistroEmpleado() {
                 <span className="text-right">Acciones</span>
               </div>
 
-              <div className="mt-3 space-y-2 max-h-[560px] overflow-auto pr-1">
+              <div className={`mt-3 space-y-2 max-h-[560px] overflow-auto pr-1 sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
                 {usuariosFiltrados.length > 0 ? (
                   usuariosFiltrados.map((u) => (
                     <article
@@ -762,21 +840,23 @@ function RegistroEmpleado() {
                         </span>
                       </div>
 
-                      <div>
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <span
-                          className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                            u.rol === 'admin' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+                          className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                            u.rol === 'admin'
+                              ? (darkMode ? 'bg-red-950/50 text-red-200 border-red-800' : 'bg-red-50 text-red-600 border-red-200')
+                              : (darkMode ? 'bg-green-950/40 text-green-200 border-green-800' : 'bg-green-50 text-green-700 border-green-200')
                           }`}
                         >
                           {u.rol}
                         </span>
-                        <div className="mt-1">
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg ${
-                            u.notificar_email ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
-                          }`}>
-                            {u.notificar_email ? 'Email on' : 'Email off'}
-                          </span>
-                        </div>
+                        <span className={`inline-flex items-center text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border ${
+                          u.notificar_email
+                            ? (darkMode ? 'bg-emerald-950/40 text-emerald-200 border-emerald-800' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                            : (darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200')
+                        }`}>
+                          {u.notificar_email ? 'Email on' : 'Email off'}
+                        </span>
                       </div>
 
                       <div className="flex justify-end gap-2">

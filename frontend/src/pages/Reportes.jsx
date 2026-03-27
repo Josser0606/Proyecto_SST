@@ -99,6 +99,14 @@ function Reportes() {
     return `${total} total · U:${util} I:${importante} MG:${meGusta}`;
   };
 
+  const reaccionUsuarioTexto = (reg) => {
+    const key = String(reg.reaccion_usuario || '').toLowerCase();
+    if (key === 'util') return 'Util';
+    if (key === 'importante') return 'Importante';
+    if (key === 'me-gusta') return 'Me gusta';
+    return 'Sin reaccion';
+  };
+
   const desglosarReacciones = (reg) => ({
     total: Number(reg.total_reacciones || 0),
     util: Number(reg.reaccion_util || 0),
@@ -154,7 +162,7 @@ function Reportes() {
           area: normalizarTexto(reg.area),
           categoria: normalizarTexto(reg.categoria_auditoria),
           tipo: normalizarTexto(reg.tipo_confirmacion === 'reconfirmacion' ? 'reconfirmacion' : 'confirmacion inicial'),
-          reacciones: normalizarTexto(resumenReaccionesTexto(reg))
+          reacciones: normalizarTexto(reaccionUsuarioTexto(reg))
         };
 
         let score = 0;
@@ -483,7 +491,7 @@ function Reportes() {
       comunicado: reg.publicacion || '',
       empleado: reg.empleado || '',
       area: reg.area || '',
-      reacciones: resumenReaccionesTexto(reg),
+      reacciones: reaccionUsuarioTexto(reg),
       tipo_confirmacion: reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Confirmacion inicial',
       fecha_confirmacion: formatearFechaLectura(reg.fecha_lectura)
     }));
@@ -753,22 +761,24 @@ function Reportes() {
 
       <main className={`flex-1 min-w-0 p-4 sm:p-6 md:p-10 ${sidebarCollapsed ? 'lg:ml-16 lg:w-[calc(100%-4rem)]' : 'lg:ml-72 lg:w-[calc(100%-18rem)]'}`}>
         <div className="max-w-6xl mx-auto">
-        <div className="lg:hidden grid grid-cols-5 gap-2 mb-4">
-          <button onClick={() => navigate('/dashboard')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-            Inicio
-          </button>
-          <button onClick={() => navigate('/admin')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-            Crear
-          </button>
-          <button onClick={() => navigate('/registro-personal')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-            Empleados
-          </button>
-          <button onClick={() => navigate('/reportes')} className="px-2 py-2.5 rounded-xl bg-green-600 text-white text-[11px] font-black">
-            Auditoria
-          </button>
-          <button onClick={() => navigate('/reportes-panel')} className={`px-2 py-2.5 rounded-xl text-[11px] font-black border ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
-            Panel
-          </button>
+        <div className={`lg:hidden mb-4 rounded-2xl border p-2 overflow-x-auto sidebar-scroll ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-gray-200 bg-white'}`}>
+          <div className="flex items-center gap-2 min-w-max">
+            <button onClick={() => navigate('/dashboard')} className={`px-3 py-2 rounded-xl text-[11px] font-black border whitespace-nowrap ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+              Inicio
+            </button>
+            <button onClick={() => navigate('/admin')} className={`px-3 py-2 rounded-xl text-[11px] font-black border whitespace-nowrap ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+              Crear
+            </button>
+            <button onClick={() => navigate('/registro-personal')} className={`px-3 py-2 rounded-xl text-[11px] font-black border whitespace-nowrap ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+              Empleados
+            </button>
+            <button onClick={() => navigate('/reportes')} className="px-3 py-2 rounded-xl bg-green-600 text-white text-[11px] font-black whitespace-nowrap">
+              Auditoria
+            </button>
+            <button onClick={() => navigate('/reportes-panel')} className={`px-3 py-2 rounded-xl text-[11px] font-black border whitespace-nowrap ${darkMode ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-gray-200 bg-white text-slate-700 hover:bg-green-50 hover:text-green-800'}`}>
+              Panel
+            </button>
+          </div>
         </div>
 
         <section className={`mb-4 rounded-[2rem] border p-6 md:p-8 text-white shadow-xl min-h-[170px] ${
@@ -782,7 +792,7 @@ function Reportes() {
               <h1 className="text-2xl md:text-4xl font-black text-white">Auditoria de Lectura</h1>
               <p className="text-green-50 font-medium mt-2">Historico de lecturas por comunicado</p>
             </div>
-            <div className="grid grid-cols-3 gap-3 md:min-w-[350px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:min-w-[350px]">
               <div className="rounded-2xl bg-white/20 border border-white/30 p-3">
                 <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">Registros</p>
                 <p className="text-2xl font-black">{datosFiltrados.length}</p>
@@ -799,7 +809,7 @@ function Reportes() {
           </div>
         </section>
 
-        <div className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full 2xl:w-auto 2xl:min-w-[620px] rounded-2xl border p-3 mb-3 sm:mb-5 ${
+        <div className={`grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_160px_auto] gap-3 w-full rounded-2xl border p-3 mb-3 sm:mb-5 ${
             darkMode ? 'border-slate-800 bg-slate-900/50' : 'border-gray-200 bg-white/90'
           }`}>
             <div className="relative w-full min-w-0">
@@ -861,7 +871,7 @@ function Reportes() {
             </button>
         </div>
 
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <p className={`text-[11px] ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
             Busqueda inteligente por empleado, comunicado, area, categoria y tipo.
           </p>
@@ -983,7 +993,7 @@ function Reportes() {
                               </div>
                             </div>
                             <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Reacciones: {resumenReaccionesTexto(reg)}
+                              Reaccion: {reaccionUsuarioTexto(reg)}
                             </p>
                           </article>
                         ))}
@@ -1035,7 +1045,7 @@ function Reportes() {
                       </div>
                     </div>
                     <p className={`mt-2 text-[11px] font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                      Reacciones: {resumenReaccionesTexto(reg)}
+                      Reaccion: {reaccionUsuarioTexto(reg)}
                     </p>
                   </article>
                 ))
@@ -1047,7 +1057,7 @@ function Reportes() {
             )}
           </div>
 
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block">
             {datosFiltrados.length > 0 ? (
               vistaAuditoria === 'categorias' ? (
                 <div className="p-4 space-y-4">
@@ -1080,77 +1090,63 @@ function Reportes() {
                       </button>
 
                       {categoriasAbiertas[grupo.categoria] && (
-                        <div className={`overflow-auto max-h-[60vh] xl:max-h-[66vh] 2xl:max-h-[72vh] sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className={darkMode ? 'bg-green-700/90 text-white' : 'bg-green-600 text-white'}>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Comunicado</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Empleado</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Area</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Tipo</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Reacciones</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Fecha de Confirmacion</th>
-                              <th className={`sticky top-0 z-10 px-6 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
-                            {grupo.registros.map((reg, index) => (
-                              <tr key={`${grupo.categoria}-${index}`} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                                <td className="px-6 py-3.5">
-                                  <p className={`font-bold text-sm leading-tight max-w-[320px] truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
-                                    {highlightText(reg.publicacion)}
-                                  </p>
-                                </td>
-                                <td className="px-6 py-3.5">
-                                  <p className={`font-bold max-w-[220px] truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
-                                    {highlightText(reg.empleado || 'Nombre no registrado')}
-                                  </p>
-                                </td>
-                                <td className="px-6 py-3.5">
-                                  <span className={`inline-flex px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                                    darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                                  }`}>
-                                    {highlightText(reg.area)}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-3.5">
-                                  <span className={`inline-flex px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                                    reg.tipo_confirmacion === 'reconfirmacion'
+                        <div className={`p-4 space-y-2 max-h-[60vh] xl:max-h-[66vh] 2xl:max-h-[72vh] overflow-y-auto sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
+                          {grupo.registros.map((reg, index) => {
+                            const reaccion = reaccionUsuarioTexto(reg);
+                            return (
+                              <article
+                                key={`${grupo.categoria}-${index}`}
+                                className={`rounded-xl border p-3 sm:p-4 transition-colors ${darkMode ? 'border-slate-700 bg-slate-900 hover:bg-slate-800/80' : 'border-slate-200 bg-white hover:bg-green-50/40'}`}
+                              >
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3 items-start">
+                                  <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0">
+                                    <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicado</p>
+                                    <p className={`font-bold text-sm leading-tight break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
+                                      {highlightText(reg.publicacion)}
+                                    </p>
+                                  </div>
+                                  <div className="col-span-1 xl:col-span-3 min-w-0">
+                                    <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Empleado</p>
+                                    <p className={`font-bold text-sm break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
+                                      {highlightText(reg.empleado || 'Nombre no registrado')}
+                                    </p>
+                                  </div>
+                                  <div className="col-span-1 xl:col-span-2">
+                                    <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Area</p>
+                                    <span className={`inline-flex px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                                      {highlightText(reg.area)}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-1 xl:col-span-1">
+                                    <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tipo</p>
+                                    <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${reg.tipo_confirmacion === 'reconfirmacion'
                                       ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
                                       : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                      }`}>
+                                      {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconf.' : 'Inicial'}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-1 sm:col-span-2 xl:col-span-2 xl:text-right">
+                                    <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Fecha</p>
+                                    <p className={`font-mono text-[11px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{formatearFechaLectura(reg.fecha_lectura)}</p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                  <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                                    reaccion === 'Util'
+                                      ? (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                                      : reaccion === 'Importante'
+                                        ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                        : reaccion === 'Me gusta'
+                                          ? (darkMode ? 'bg-sky-900/30 text-sky-200 border-sky-700' : 'bg-sky-50 text-sky-700 border-sky-200')
+                                          : (darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200')
                                   }`}>
-                                    {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                                    Reaccion: {reaccion}
                                   </span>
-                                </td>
-                                <td className="px-6 py-3.5">
-                                  {(() => {
-                                    const rx = desglosarReacciones(reg);
-                                    return (
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-                                          Total {rx.total}
-                                        </span>
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-emerald-900/30 border-emerald-700 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-                                          U {rx.util}
-                                        </span>
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-amber-900/30 border-amber-700 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                                          I {rx.importante}
-                                        </span>
-                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-sky-900/30 border-sky-700 text-sky-200' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
-                                          MG {rx.meGusta}
-                                        </span>
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
-                                <td className={`px-6 py-3.5 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {formatearFechaLectura(reg.fecha_lectura)}
-                                </td>
-                                <td className="px-6 py-3.5 text-right">
                                   <button
                                     type="button"
                                     onClick={() => eliminarReporte(reg.id)}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition ${
+                                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition w-full sm:w-auto ${
                                       darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                                     }`}
                                   >
@@ -1159,88 +1155,73 @@ function Reportes() {
                                     </svg>
                                     Eliminar
                                   </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                </div>
+                              </article>
+                            );
+                          })}
                         </div>
                       )}
                     </section>
                   ))}
                 </div>
               ) : (
-                <div className={`overflow-auto max-h-[64vh] xl:max-h-[70vh] 2xl:max-h-[76vh] sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className={darkMode ? 'bg-green-700 text-white' : 'bg-green-600 text-white'}>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Comunicado</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Empleado</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Area</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Tipo</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Reacciones</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Fecha de Confirmacion</th>
-                      <th className={`sticky top-0 z-10 px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-right ${darkMode ? 'bg-green-700' : 'bg-green-600'}`}>Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className={darkMode ? 'divide-y divide-slate-800' : 'divide-y divide-gray-100'}>
-                    {datosFiltrados.map((reg, index) => (
-                      <tr key={index} className={`transition-colors group ${darkMode ? 'hover:bg-slate-800/70' : 'hover:bg-green-50/40'}`}>
-                        <td className="px-8 py-4">
-                          <p className={`font-bold text-sm leading-tight max-w-[360px] truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
-                            {highlightText(reg.publicacion)}
-                          </p>
-                        </td>
-                        <td className="px-8 py-4">
-                          <p className={`font-bold max-w-[240px] truncate ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
-                            {highlightText(reg.empleado || 'Nombre no registrado')}
-                          </p>
-                        </td>
-                        <td className="px-8 py-4">
-                          <span className={`inline-flex px-4 py-1.5 rounded-xl text-[10px] font-black uppercase border ${
-                            darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            {highlightText(reg.area)}
-                          </span>
-                        </td>
-                        <td className="px-8 py-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border ${
-                            reg.tipo_confirmacion === 'reconfirmacion'
+                <div className={`p-4 space-y-2 max-h-[64vh] xl:max-h-[70vh] 2xl:max-h-[76vh] overflow-y-auto sidebar-scroll ${darkMode ? 'sidebar-scroll-dark' : ''}`}>
+                  {datosFiltrados.map((reg, index) => {
+                    const reaccion = reaccionUsuarioTexto(reg);
+                    return (
+                      <article
+                        key={`desktop-list-${index}`}
+                        className={`rounded-xl border p-3 sm:p-4 transition-colors ${darkMode ? 'border-slate-700 bg-slate-900 hover:bg-slate-800/80' : 'border-slate-200 bg-white hover:bg-green-50/40'}`}
+                      >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-3 items-start">
+                          <div className="col-span-1 sm:col-span-2 xl:col-span-4 min-w-0">
+                            <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Comunicado</p>
+                            <p className={`font-bold text-sm leading-tight break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={reg.publicacion || ''}>
+                              {highlightText(reg.publicacion)}
+                            </p>
+                          </div>
+                          <div className="col-span-1 xl:col-span-3 min-w-0">
+                            <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Empleado</p>
+                            <p className={`font-bold text-sm break-words [overflow-wrap:anywhere] ${darkMode ? 'text-slate-200' : 'text-slate-700'}`} title={reg.empleado || 'Nombre no registrado'}>
+                              {highlightText(reg.empleado || 'Nombre no registrado')}
+                            </p>
+                          </div>
+                          <div className="col-span-1 xl:col-span-2">
+                            <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Area</p>
+                            <span className={`inline-flex px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                              {highlightText(reg.area)}
+                            </span>
+                          </div>
+                          <div className="col-span-1 xl:col-span-1">
+                            <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Tipo</p>
+                            <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${reg.tipo_confirmacion === 'reconfirmacion'
                               ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
                               : (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                              }`}>
+                              {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconf.' : 'Inicial'}
+                            </span>
+                          </div>
+                          <div className="col-span-1 sm:col-span-2 xl:col-span-2 xl:text-right">
+                            <p className={`text-[10px] font-black uppercase tracking-wider mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Fecha</p>
+                            <p className={`font-mono text-[11px] ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{formatearFechaLectura(reg.fecha_lectura)}</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <span className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                            reaccion === 'Util'
+                              ? (darkMode ? 'bg-emerald-900/30 text-emerald-200 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+                              : reaccion === 'Importante'
+                                ? (darkMode ? 'bg-amber-900/30 text-amber-200 border-amber-700' : 'bg-amber-50 text-amber-700 border-amber-200')
+                                : reaccion === 'Me gusta'
+                                  ? (darkMode ? 'bg-sky-900/30 text-sky-200 border-sky-700' : 'bg-sky-50 text-sky-700 border-sky-200')
+                                  : (darkMode ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200')
                           }`}>
-                            {reg.tipo_confirmacion === 'reconfirmacion' ? 'Reconfirmacion' : 'Inicial'}
+                            Reaccion: {reaccion}
                           </span>
-                        </td>
-                        <td className="px-8 py-4">
-                          {(() => {
-                            const rx = desglosarReacciones(reg);
-                            return (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-                                  Total {rx.total}
-                                </span>
-                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-emerald-900/30 border-emerald-700 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-                                  U {rx.util}
-                                </span>
-                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-amber-900/30 border-amber-700 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                                  I {rx.importante}
-                                </span>
-                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black border ${darkMode ? 'bg-sky-900/30 border-sky-700 text-sky-200' : 'bg-sky-50 border-sky-200 text-sky-700'}`}>
-                                  MG {rx.meGusta}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </td>
-                        <td className={`px-8 py-4 text-right font-mono text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {formatearFechaLectura(reg.fecha_lectura)}
-                        </td>
-                        <td className="px-8 py-4 text-right">
                           <button
                             type="button"
                             onClick={() => eliminarReporte(reg.id)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition ${
+                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border transition w-full sm:w-auto ${
                               darkMode ? 'border-red-800 bg-slate-900 text-red-300 hover:bg-red-900/20' : 'border-red-200 bg-white text-red-600 hover:bg-red-50'
                             }`}
                           >
@@ -1249,11 +1230,10 @@ function Reportes() {
                             </svg>
                             Eliminar
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
               )
             ) : (

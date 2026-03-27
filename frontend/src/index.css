@@ -38,6 +38,25 @@ textarea:disabled {
   height: 8px;
 }
 
+.sidebar-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar-scroll::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.sidebar-scroll::-webkit-scrollbar-button:single-button:vertical:decrement,
+.sidebar-scroll::-webkit-scrollbar-button:single-button:vertical:increment {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 .sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
   border-radius: 9999px;
@@ -59,11 +78,17 @@ textarea:disabled {
 }
 
 .sidebar-scroll-dark::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 9999px;
 }
 
 .sidebar-scroll-dark::-webkit-scrollbar-thumb {
-  border-color: rgba(15, 23, 42, 0.45);
+  background: linear-gradient(180deg, #34d399 0%, #16a34a 100%);
+  border-color: rgba(15, 23, 42, 0.55);
+}
+
+.sidebar-scroll-dark::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
 }
 
 .modal-scroll {
@@ -75,6 +100,25 @@ textarea:disabled {
 .modal-scroll::-webkit-scrollbar {
   width: 9px;
   height: 9px;
+}
+
+.modal-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.modal-scroll::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.modal-scroll::-webkit-scrollbar-button:single-button:vertical:decrement,
+.modal-scroll::-webkit-scrollbar-button:single-button:vertical:increment {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .modal-scroll::-webkit-scrollbar-track {
@@ -134,4 +178,62 @@ textarea:disabled {
 
 .field-row-animate {
   animation: field-row-enter 0.24s ease;
+}
+
+.filter-scroll {
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+  scrollbar-color: #22c55e transparent;
+}
+
+.filter-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.filter-scroll::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.filter-scroll::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.filter-scroll::-webkit-scrollbar-button:start:decrement,
+.filter-scroll::-webkit-scrollbar-button:end:increment,
+.filter-scroll::-webkit-scrollbar-button:vertical:start:decrement,
+.filter-scroll::-webkit-scrollbar-button:vertical:end:increment {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.filter-scroll::-webkit-scrollbar-button:single-button:vertical:decrement,
+.filter-scroll::-webkit-scrollbar-button:single-button:vertical:increment {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.filter-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.filter-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+  border-radius: 9999px;
+  min-height: 26px;
+}
+
+.filter-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+}
+
+.filter-scroll-dark {
+  scrollbar-color: #22c55e transparent;
 }
