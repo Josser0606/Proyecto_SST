@@ -11,6 +11,7 @@ import AdminPanel from './pages/AdminPanel';
 import Reportes from './pages/Reportes';
 import ReportesPanel from './pages/ReportesPanel';
 import { setAuthToken } from './config/api';
+import { rememberRoute } from './hooks/useSmartBack';
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutos
 
@@ -85,6 +86,17 @@ function SessionInactivityGuard() {
   return null;
 }
 
+function RouteMemoryTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname === '/') return;
+    rememberRoute(location.pathname);
+  }, [location.pathname]);
+
+  return null;
+}
+
 function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -94,6 +106,7 @@ function App() {
   return (
     <BrowserRouter>
       <SessionInactivityGuard />
+      <RouteMemoryTracker />
       <Toaster
         position="top-right"
         toastOptions={{

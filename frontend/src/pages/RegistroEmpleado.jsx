@@ -6,6 +6,7 @@ import { FiSliders } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
+import useSmartBack from '../hooks/useSmartBack';
 
 const AREAS = [
   'SST y GH',
@@ -42,11 +43,16 @@ function RegistroEmpleado() {
   const formSnapshotRef = useRef(BASE_FORM);
   const areaFilterRef = useRef(null);
   const navigateBase = useNavigate();
+  const smartBack = useSmartBack('/dashboard');
   const hasUnsavedChangesRef = useRef(false);
   const navigate = useCallback((to, options) => {
     if (hasUnsavedChangesRef.current && !window.confirm('Tienes cambios sin guardar en el formulario de empleado. ¿Seguro que deseas salir?')) return;
     navigateBase(to, options);
   }, [navigateBase]);
+  const goBack = useCallback(() => {
+    if (hasUnsavedChangesRef.current && !window.confirm('Tienes cambios sin guardar en el formulario de empleado. ¿Seguro que deseas salir?')) return;
+    smartBack();
+  }, [smartBack]);
 
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
   const cargarUsuarios = useCallback(async () => {
@@ -290,7 +296,7 @@ function RegistroEmpleado() {
             <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuarioActual?.area}</p>
           </div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={goBack}
             className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -909,3 +915,5 @@ function RegistroEmpleado() {
 }
 
 export default RegistroEmpleado;
+
+

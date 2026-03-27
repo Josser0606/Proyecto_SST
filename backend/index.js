@@ -121,6 +121,14 @@ const loginLimiter = rateLimit({
   max: loginRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => {
+    const userKey = normalizeText(req?.body?.nombre || '');
+    // Limitar por usuario para no afectar a toda una red compartida.
+    // Si no viene usuario, usar IP como respaldo.
+    if (userKey) return `login-user:${userKey}`;
+    return `login-ip:${req.ip}`;
+  },
   handler: (req, res) => {
     res.status(429).json({ success: false, message: 'Demasiados intentos de inicio de sesion. Intenta de nuevo en unos minutos.' });
   }

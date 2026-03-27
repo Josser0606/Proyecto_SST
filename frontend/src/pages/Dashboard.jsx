@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { FiBell, FiCheckCircle, FiClock, FiEdit2, FiFileText, FiHeart, FiImage, FiLink2, FiMoon, FiStar, FiSun, FiThumbsUp, FiTrash2, FiUpload, FiUser, FiX, FiZap } from 'react-icons/fi';
+import { FiBell, FiCheckCircle, FiClock, FiEdit2, FiExternalLink, FiFileText, FiHeart, FiImage, FiLink2, FiMoon, FiRefreshCw, FiStar, FiSun, FiThumbsUp, FiTrash2, FiUpload, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl, assetUrl, setAuthToken } from '../config/api';
 import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
@@ -85,6 +85,8 @@ function Dashboard() {
     notif_recordatorio: true
   });
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+  const [previewRecurso, setPreviewRecurso] = useState(null);
+  const [previewIframeCargado, setPreviewIframeCargado] = useState(false);
 
   const [editandoId, setEditandoId] = useState(null);
   const [formEdit, setFormEdit] = useState({
@@ -447,6 +449,72 @@ function Dashboard() {
   };
 
   const shortName = (name = '') => (name.length > 34 ? `${name.slice(0, 31)}...` : name);
+  const nombrePerfil = miPerfil?.nombre_completo || usuario?.nombre_completo || 'Usuario';
+  const avatarActivo = String(perfilForm.avatar_url || miPerfil?.avatar_url || '').trim();
+  const inicialesPerfil = useMemo(() => {
+    const parts = String(nombrePerfil || '')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!parts.length) return 'U';
+    return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() || '').join('') || 'U';
+  }, [nombrePerfil]);
+  const generarAvatarPerfil = () => {
+    const bgPalette = ['16a34a', '0ea5e9', '4f46e5', 'ea580c', 'be123c', '0f766e'];
+    const bg = bgPalette[Math.floor(Math.random() * bgPalette.length)];
+    const encodedName = encodeURIComponent(nombrePerfil);
+    const url = `https://ui-avatars.com/api/?name=${encodedName}&background=${bg}&color=ffffff&bold=true&format=png&size=256`;
+    setPerfilForm((prev) => ({ ...prev, avatar_url: url }));
+  };
+  const getExtension = (value = '') => {
+    const clean = String(value || '').split('?')[0].split('#')[0];
+    const pieces = clean.split('.');
+    if (pieces.length < 2) return '';
+    return pieces.pop().toLowerCase();
+  };
+
+  const resolverModoPreview = (url, tipo = '', nombre = '') => {
+    const ext = getExtension(nombre) || getExtension(url);
+    const isHttp = /^https?:\/\//i.test(String(url || ''));
+    const officeExt = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv'];
+
+    if (tipo === 'archivo') {
+      if (ext === 'pdf') return 'pdf';
+      if (officeExt.includes(ext) && isHttp) return 'office';
+      return 'externo';
+    }
+    if (isHttp) return 'iframe';
+    return 'externo';
+  };
+
+  const abrirRecurso = (recurso) => {
+    const url = recurso?.tipo === 'archivo' ? assetUrl(recurso.url) : recurso?.url;
+    if (!url) return;
+    const modo = resolverModoPreview(url, recurso?.tipo, recurso?.nombre);
+    if (modo === 'externo') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setPreviewIframeCargado(false);
+    setPreviewRecurso({
+      nombre: recurso?.nombre || 'Recurso',
+      tipo: recurso?.tipo || 'link',
+      url,
+      modo
+    });
+  };
+
+  useEffect(() => {
+    if (!previewRecurso || previewRecurso.modo !== 'iframe') return undefined;
+    const timer = window.setTimeout(() => {
+      if (!previewIframeCargado && previewRecurso?.url) {
+        toast('No se pudo mostrar dentro del sistema. Abriendo por fuera...');
+        window.open(previewRecurso.url, '_blank', 'noopener,noreferrer');
+        setPreviewRecurso(null);
+      }
+    }, 3500);
+    return () => window.clearTimeout(timer);
+  }, [previewRecurso, previewIframeCargado]);
 
   const toggleReaccion = async (publicacionId, actual, reactionKey) => {
     if (!usuario?.id) return;
@@ -808,10 +876,25 @@ function Dashboard() {
           </button>
           <button
             onClick={() => setPerfilOpen(true)}
-            className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}
+            className={`p-1 rounded-xl transition-all border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700' : 'bg-gray-100 border-gray-200 text-slate-500 hover:bg-gray-200'}`}
             title="Mi perfil"
           >
-            <FiUser className="w-5 h-5" />
+            {avatarActivo ? (
+              <img
+                src={avatarActivo}
+                alt="Avatar"
+                className="w-8 h-8 rounded-lg object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <span className={`w-8 h-8 rounded-lg inline-flex items-center justify-center text-[11px] font-black ${
+                darkMode ? 'bg-slate-700 text-slate-100' : 'bg-white text-slate-700'
+              }`}>
+                {inicialesPerfil}
+              </span>
+            )}
           </button>
           <div className={`hidden md:block text-right border-r pr-2 sm:pr-4 min-w-0 ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
             <p className="text-xs sm:text-sm font-black max-w-[140px] sm:max-w-none truncate">{usuario?.nombre_completo}</p>
@@ -1495,15 +1578,22 @@ function Dashboard() {
                           <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}>Recursos adjuntos</p>
                           <div className="flex flex-wrap gap-2">
                             {otrosRecursos.map((r) => (
-                              <a key={r.id} href={r.tipo === 'archivo' ? assetUrl(r.url) : r.url} target="_blank" rel="noreferrer" className={`px-3 py-2 rounded-lg text-xs font-bold border hover:border-green-300 hover:text-green-700 max-w-full break-all [overflow-wrap:anywhere] inline-block ${
-                                r.tipo === 'link'
-                                  ? (darkMode
-                                    ? 'bg-green-900/25 border-green-700 text-green-300 md:bg-slate-900 md:border-slate-700 md:text-slate-200'
-                                    : 'bg-green-50 border-green-300 text-green-700 md:bg-white md:border-slate-200 md:text-slate-700')
-                                  : (darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200')
-                              }`}>
-                                {r.tipo === 'archivo' ? 'Archivo' : 'Link'}: {r.nombre}
-                              </a>
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => abrirRecurso(r)}
+                                className={`px-3 py-2 rounded-lg text-xs font-bold border hover:border-green-300 hover:text-green-700 max-w-full break-all [overflow-wrap:anywhere] inline-flex items-center gap-1.5 ${
+                                  r.tipo === 'link'
+                                    ? (darkMode
+                                      ? 'bg-green-900/25 border-green-700 text-green-300 md:bg-slate-900 md:border-slate-700 md:text-slate-200'
+                                      : 'bg-green-50 border-green-300 text-green-700 md:bg-white md:border-slate-200 md:text-slate-700')
+                                    : (darkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200')
+                                }`}
+                                title="Abrir vista previa"
+                              >
+                                <FiExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                <span className="text-left">{r.tipo === 'archivo' ? 'Archivo' : 'Link'}: {r.nombre}</span>
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -1678,10 +1768,77 @@ function Dashboard() {
         </main>
       </div>
 
+      {previewRecurso && (
+        <div className="fixed inset-0 z-[79] bg-slate-900/55 backdrop-blur-[1px] flex items-center justify-center p-3 sm:p-4">
+          <div className={`w-full max-w-5xl rounded-2xl border overflow-hidden ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b flex items-center justify-between gap-3 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+              <div className="min-w-0">
+                <p className={`text-xs font-black uppercase tracking-wider ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Vista previa
+                </p>
+                <p className={`text-sm font-black truncate ${darkMode ? 'text-slate-100' : 'text-slate-800'}`} title={previewRecurso.nombre}>
+                  {previewRecurso.nombre}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(previewRecurso.url, '_blank', 'noopener,noreferrer')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-black ${
+                    darkMode ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300' : 'border-slate-200 bg-white text-slate-700 hover:border-green-300 hover:text-green-700'
+                  }`}
+                >
+                  <FiExternalLink className="w-3.5 h-3.5" />
+                  Abrir afuera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewRecurso(null)}
+                  className={`w-8 h-8 rounded-lg border flex items-center justify-center ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-white text-slate-500'}`}
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className={`h-[70vh] ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`}>
+              {previewRecurso.modo === 'pdf' && (
+                <iframe
+                  title={`preview-${previewRecurso.nombre}`}
+                  src={previewRecurso.url}
+                  className="w-full h-full"
+                />
+              )}
+
+              {previewRecurso.modo === 'office' && (
+                <iframe
+                  title={`preview-office-${previewRecurso.nombre}`}
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewRecurso.url)}`}
+                  className="w-full h-full"
+                />
+              )}
+
+              {previewRecurso.modo === 'iframe' && (
+                <iframe
+                  title={`preview-link-${previewRecurso.nombre}`}
+                  src={previewRecurso.url}
+                  className="w-full h-full"
+                  onLoad={() => setPreviewIframeCargado(true)}
+                  onError={() => {
+                    window.open(previewRecurso.url, '_blank', 'noopener,noreferrer');
+                    setPreviewRecurso(null);
+                  }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {perfilOpen && (
-        <div className="fixed inset-0 z-[80] bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center p-4">
-          <div className={`w-full max-w-md rounded-2xl border p-4 sm:p-5 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className="flex items-center justify-between mb-3">
+        <div className="fixed inset-0 z-[80] bg-slate-900/50 backdrop-blur-[1px] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className={`w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl border ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} h-[92vh] sm:h-auto max-h-[92vh] flex flex-col`}>
+            <div className={`flex items-center justify-between px-4 sm:px-5 py-3 border-b ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
               <h3 className={`text-base font-black ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Mi perfil</h3>
               <button
                 type="button"
@@ -1691,20 +1848,20 @@ function Dashboard() {
                 <FiX className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3">
-              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/60' : 'border-slate-200 bg-slate-50'}`}>
+            <div className={`flex-1 overflow-y-auto modal-scroll px-4 sm:px-5 py-3 sm:py-4 space-y-3 ${darkMode ? 'modal-scroll-dark' : ''}`}>
+              <div className={`rounded-xl border p-3 ${darkMode ? 'border-slate-700 bg-slate-800/60 modal-scroll-dark' : 'border-slate-200 bg-slate-50'}`}>
                 <p className={`text-[10px] font-black uppercase tracking-wider mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>General</p>
-                <div className="grid grid-cols-[56px_1fr] gap-3 items-center mb-3">
-                  <div className={`w-14 h-14 rounded-xl overflow-hidden border ${darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-300 bg-white'}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-[56px_1fr] gap-3 items-center mb-3">
+                  <div className={`w-14 h-14 rounded-xl overflow-hidden border mx-auto sm:mx-0 ${darkMode ? 'border-slate-600 bg-slate-900' : 'border-slate-300 bg-white'}`}>
                     {perfilForm.avatar_url ? (
-                      <img src={perfilForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                      <img src={perfilForm.avatar_url} alt="Avatar" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-lg font-black text-slate-400">
-                        {(miPerfil?.nombre_completo || usuario?.nombre_completo || 'U').slice(0, 1).toUpperCase()}
+                        {inicialesPerfil}
                       </div>
                     )}
                   </div>
-                  <div className={`text-xs ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <div className={`text-xs text-center sm:text-left ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     <p className="font-black text-sm">{miPerfil?.nombre_completo || usuario?.nombre_completo}</p>
                     <p className="uppercase tracking-wider text-[10px]">{miPerfil?.area || usuario?.area}</p>
                   </div>
@@ -1729,6 +1886,24 @@ function Dashboard() {
                       placeholder="https://..."
                       className={`w-full px-3 py-2 rounded-lg border text-sm ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}
                     />
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={generarAvatarPerfil}
+                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border text-[11px] font-black ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300' : 'border-slate-200 bg-white text-slate-700 hover:border-green-300 hover:text-green-700'}`}
+                      >
+                        <FiRefreshCw className="w-3.5 h-3.5" />
+                        Generar avatar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPerfilForm((prev) => ({ ...prev, avatar_url: '' }))}
+                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg border text-[11px] font-black ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:border-red-600 hover:text-red-300' : 'border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600'}`}
+                      >
+                        <FiX className="w-3.5 h-3.5" />
+                        Quitar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1771,11 +1946,11 @@ function Dashboard() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className={`px-4 sm:px-5 py-3 border-t flex flex-col-reverse sm:flex-row sm:justify-end gap-2 ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
               <button
                 type="button"
                 onClick={cerrarPerfil}
-                className={`px-3 py-2 rounded-lg border text-xs font-black ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                className={`px-3 py-2.5 rounded-lg border text-xs font-black w-full sm:w-auto ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
               >
                 Cancelar
               </button>
@@ -1783,7 +1958,7 @@ function Dashboard() {
                 type="button"
                 disabled={guardandoPerfil}
                 onClick={guardarPerfil}
-                className="px-3 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-xs font-black"
+                className="px-3 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-xs font-black w-full sm:w-auto"
               >
                 {guardandoPerfil ? 'Guardando...' : 'Guardar'}
               </button>

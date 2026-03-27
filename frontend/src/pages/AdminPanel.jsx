@@ -6,6 +6,7 @@ import { FiBarChart2, FiCheckCircle, FiEye, FiFile, FiFileText, FiHeart, FiImage
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
 import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
+import useSmartBack from '../hooks/useSmartBack';
 
 const CATEGORIAS = [
   'SST y GH',
@@ -94,10 +95,15 @@ function AdminPanel() {
     tieneCambiosSinGuardar && !loading,
     'Tienes un comunicado en edicion. ¿Seguro que deseas salir sin guardar los cambios?'
   );
+  const smartBack = useSmartBack('/dashboard');
   const navigate = useCallback((to, options) => {
     if (!confirmIfNeeded()) return;
     navigateBase(to, options);
   }, [confirmIfNeeded, navigateBase]);
+  const goBack = useCallback(() => {
+    if (!confirmIfNeeded()) return;
+    smartBack();
+  }, [confirmIfNeeded, smartBack]);
   const toggleDarkMode = () => {
     const next = !darkMode;
     setDarkMode(next);
@@ -300,7 +306,7 @@ function AdminPanel() {
           <button onClick={toggleDarkMode} className={`p-2.5 rounded-xl transition-all ${darkMode ? 'bg-slate-800 text-yellow-400' : 'bg-gray-100 text-slate-500 hover:bg-gray-200'}`}>
             {darkMode ? 'Light' : 'Dark'}
           </button>
-          <button onClick={() => navigate('/dashboard')} className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors">
+          <button onClick={goBack} className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             <span className="text-xs font-bold uppercase tracking-tighter hidden sm:block">Volver</span>
           </button>

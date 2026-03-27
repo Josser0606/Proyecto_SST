@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
+import useSmartBack from '../hooks/useSmartBack';
 
 const SEARCH_KEY_REPORTES = 'reportes_search_history_v1';
 const REPORTES_SEARCH_SCOPES = [
@@ -54,6 +55,7 @@ function Reportes() {
     }
   });
   const navigate = useNavigate();
+  const goBack = useSmartBack('/dashboard');
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
 
   const toLocalYmd = (date) => {
@@ -624,7 +626,7 @@ function Reportes() {
             <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuarioActual?.area}</p>
           </div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={goBack}
             className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import logoSaciar from '../assets/logo_saciar.png';
 import { apiUrl } from '../config/api';
+import useSmartBack from '../hooks/useSmartBack';
 
 function ReportesPanel() {
   const [reporte, setReporte] = useState([]);
@@ -16,6 +17,7 @@ function ReportesPanel() {
   const [fechaBaseSemana, setFechaBaseSemana] = useState(() => new Date());
   const [fechaCalendarioSeleccionada, setFechaCalendarioSeleccionada] = useState('');
   const navigate = useNavigate();
+  const goBack = useSmartBack('/dashboard');
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
 
   const toLocalYmd = (date) => {
@@ -278,7 +280,7 @@ function ReportesPanel() {
             <p className="text-xs sm:text-sm font-black max-w-[140px] sm:max-w-none truncate">{usuarioActual?.nombre_completo}</p>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest hidden sm:block">{usuarioActual?.area}</p>
           </div>
-          <button onClick={() => navigate('/dashboard')} className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors">
+          <button onClick={goBack} className="group flex items-center gap-2 text-slate-500 hover:text-green-700 transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             <span className="text-xs font-bold uppercase tracking-tighter hidden sm:block">Volver</span>
           </button>
