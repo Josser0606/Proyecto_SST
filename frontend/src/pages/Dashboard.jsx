@@ -187,14 +187,26 @@ function Dashboard() {
           await cargarPublicaciones(false);
           return;
         }
+        localStorage.removeItem('token');
+        localStorage.removeItem('usuario');
+        setAuthToken(null);
         toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'dashboard-auth' });
+        navigate('/', { replace: true });
       } else {
         toast.error('Error al conectar con el servidor', { id: 'dashboard-load-error' });
       }
     } finally {
       cargandoPublicacionesRef.current = false;
     }
-  }, [usuario?.id]);
+  }, [usuario?.id, navigate]);
+
+  const forzarReingreso = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    setAuthToken(null);
+    toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'dashboard-auth' });
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   useEffect(() => {
     if (!usuario) {
@@ -310,7 +322,9 @@ function Dashboard() {
     } catch (error) {
       const status = error?.response?.status;
       const msg = error?.response?.data?.message;
-      if (status === 410) {
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+      } else if (status === 410) {
         toast.error(msg || 'El plazo para confirmar lectura ya vencio.', { id: loadingToast });
       } else {
         toast.error(msg || 'Error al registrar', { id: loadingToast });
@@ -361,8 +375,13 @@ function Dashboard() {
       await axios.delete(apiUrl(`/api/publicaciones/${id}`));
       toast.success('Eliminado');
       cargarPublicaciones();
-    } catch {
-      toast.error('Error al eliminar');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+      } else {
+        toast.error('Error al eliminar');
+      }
     }
   };
 
@@ -533,6 +552,11 @@ function Dashboard() {
           : p
       )));
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error?.response?.data?.message || 'No fue posible registrar reaccion';
       toast.error(msg);
     }
@@ -550,6 +574,11 @@ function Dashboard() {
       )));
       toast.success(!favoritoActual ? 'Guardado en favoritos' : 'Quitado de favoritos');
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error?.response?.data?.message || 'No fue posible actualizar favoritos';
       toast.error(msg);
     }
@@ -565,6 +594,11 @@ function Dashboard() {
         [publicacionId]: Array.isArray(data?.comentarios) ? data.comentarios : []
       }));
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error?.response?.data?.message || 'No fue posible cargar comentarios';
       toast.error(msg);
     } finally {
@@ -595,6 +629,11 @@ function Dashboard() {
       )));
       toast.success('Comentario publicado');
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error?.response?.data?.message || 'No fue posible comentar';
       toast.error(msg);
     }
@@ -618,6 +657,11 @@ function Dashboard() {
       toast.success('Perfil actualizado');
       setPerfilOpen(false);
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error?.response?.data?.message || 'No fue posible guardar el perfil';
       toast.error(msg);
     } finally {
@@ -644,8 +688,13 @@ function Dashboard() {
       editSnapshotRef.current = null;
       setEditandoId(null);
       cargarPublicaciones();
-    } catch {
-      toast.error('Error al actualizar');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+      } else {
+        toast.error('Error al actualizar');
+      }
     }
   };
 
@@ -721,8 +770,21 @@ function Dashboard() {
 
   const totalPublicaciones = publicaciones.length;
   const totalLeidas = publicaciones.filter((p) => Number(p.leido) > 0).length;
-  const totalPendientes = Math.max(totalPublicaciones - totalLeidas, 0);
-  const totalPendientesReconfirmar = publicaciones.filter((p) => Number(p.requiere_reconfirmacion) > 0 && Number(p.puede_confirmar_lectura) > 0 && Number(p.leido) === 0).length;
+  const totalPendientes = publicaciones.filter((p) => Number(p.leido) === 0).length;
+  const comunicadosVencidos = publicaciones.filter((p) => (
+    Number(p.leido) === 0 &&
+    Number(p.puede_confirmar_lectura) <= 0
+  ));
+  const totalVencidos = comunicadosVencidos.length;
+  const totalPendientesVigentes = publicaciones.filter((p) => (
+    Number(p.leido) === 0 &&
+    Number(p.puede_confirmar_lectura) > 0
+  )).length;
+  const totalPendientesReconfirmar = publicaciones.filter((p) => (
+    Number(p.leido) === 0 &&
+    Number(p.requiere_reconfirmacion) > 0 &&
+    Number(p.puede_confirmar_lectura) > 0
+  )).length;
   const ultimaLectura = publicaciones
     .filter((p) => Number(p.leido) > 0 && p.fecha_lectura)
     .map((p) => new Date(p.fecha_lectura))
@@ -750,14 +812,6 @@ function Dashboard() {
           id: `pendiente-${pub.id}`,
           prioridad: 2,
           titulo: 'Lectura pendiente',
-          detalle: pub.titulo || 'Comunicado sin titulo',
-          categoria: pub.categoria || 'General'
-        });
-      } else if (!leido && !puedeConfirmar) {
-        list.push({
-          id: `vencido-${pub.id}`,
-          prioridad: 3,
-          titulo: 'Plazo vencido',
           detalle: pub.titulo || 'Comunicado sin titulo',
           categoria: pub.categoria || 'General'
         });
@@ -820,7 +874,7 @@ function Dashboard() {
               )}
             </button>
             {notificationsOpen && (
-              <div className={`absolute right-0 mt-2 w-[min(360px,calc(100vw-1rem))] rounded-2xl border p-3 shadow-2xl z-[60] ${
+              <div className={`fixed left-2 right-2 top-[72px] sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[360px] rounded-2xl border p-3 shadow-2xl z-[70] ${
                 darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-200'
               }`}>
                 <div className="flex items-center justify-between gap-2 mb-2">
@@ -1224,7 +1278,7 @@ function Dashboard() {
               </button>
               <div
                 className={`overflow-hidden transition-all duration-300 ease-out ${
-                  showResumen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'
+                  showResumen ? 'max-h-[360px] sm:max-h-40 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-3 pb-3 pt-1">
@@ -1266,11 +1320,11 @@ function Dashboard() {
               </button>
               <div
                 className={`overflow-hidden transition-all duration-300 ease-out ${
-                  showActividad ? 'max-h-56 opacity-100' : 'max-h-0 opacity-0'
+                  showActividad ? 'max-h-[320px] sm:max-h-56 opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
                 <div className="space-y-2 px-3 pb-3 pt-1">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <article className={`rounded-lg border p-2 ${darkMode ? 'border-slate-700 bg-slate-800/70' : 'border-slate-200 bg-slate-50'}`}>
                       <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">Leidos</p>
                       <p className={`text-base font-black ${darkMode ? 'text-white' : 'text-slate-800'}`}>{totalLeidas}</p>
@@ -1278,6 +1332,10 @@ function Dashboard() {
                     <article className={`rounded-lg border p-2 ${darkMode ? 'border-sky-800 bg-sky-900/20' : 'border-sky-200 bg-sky-50/90'}`}>
                       <p className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-sky-300' : 'text-sky-700'}`}>Reconfirmar</p>
                       <p className={`text-base font-black ${darkMode ? 'text-sky-200' : 'text-sky-700'}`}>{totalPendientesReconfirmar}</p>
+                    </article>
+                    <article className={`rounded-lg border p-2 ${darkMode ? 'border-rose-800 bg-rose-900/20' : 'border-rose-200 bg-rose-50/90'}`}>
+                      <p className={`text-[9px] font-black uppercase tracking-wider ${darkMode ? 'text-rose-300' : 'text-rose-700'}`}>Vencidos</p>
+                      <p className={`text-base font-black ${darkMode ? 'text-rose-200' : 'text-rose-700'}`}>{totalVencidos}</p>
                     </article>
                   </div>
                   <div className={`rounded-lg border px-2.5 py-2 text-[10px] ${darkMode ? 'border-slate-700 bg-slate-800 text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
@@ -1288,13 +1346,13 @@ function Dashboard() {
             </section>
           </div>
 
-          {(totalPendientes > 0 || totalPendientesReconfirmar > 0) && (
+          {(totalPendientesVigentes > 0 || totalPendientesReconfirmar > 0) && (
             <div className={`mb-4 rounded-2xl border px-4 py-3 flex items-start gap-2 ${darkMode ? 'border-amber-800 bg-amber-900/20' : 'border-amber-200 bg-amber-50'}`}>
               <FiClock className={`w-4 h-4 mt-0.5 ${darkMode ? 'text-amber-300' : 'text-amber-700'}`} />
               <div className="text-sm">
                 <p className={`font-black ${darkMode ? 'text-amber-200' : 'text-amber-800'}`}>Recordatorio confirmación</p>
                 <p className={`${darkMode ? 'text-amber-100/90' : 'text-amber-700'}`}>
-                  Tienes {totalPendientes} pendiente(s) y {totalPendientesReconfirmar} por reconfirmar.
+                  Tienes {totalPendientesVigentes} pendiente(s) y {totalPendientesReconfirmar} por reconfirmar.
                 </p>
               </div>
             </div>

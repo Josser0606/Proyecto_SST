@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import logoSaciar from '../assets/logo_saciar.png';
-import { apiUrl } from '../config/api';
+import { apiUrl, setAuthToken } from '../config/api';
 import useSmartBack from '../hooks/useSmartBack';
 
 const SEARCH_KEY_REPORTES = 'reportes_search_history_v1';
@@ -57,6 +57,13 @@ function Reportes() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/dashboard');
   const usuarioActual = JSON.parse(localStorage.getItem('usuario'));
+  const forzarReingreso = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    setAuthToken(null);
+    toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'reportes-auth' });
+    navigate('/', { replace: true });
+  };
 
   const toLocalYmd = (date) => {
     const y = date.getFullYear();
@@ -131,6 +138,11 @@ function Reportes() {
       const res = await axios.get(apiUrl('/api/reportes'));
       setReporte(res.data);
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       console.error('Error al cargar reporte', error);
     }
   };
@@ -563,6 +575,11 @@ function Reportes() {
       setReporte((prev) => prev.filter((item) => item.id !== id));
       toast.success('Registro eliminado');
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const msg = error.response?.data?.message || 'No fue posible eliminar el registro';
       toast.error(msg);
     }

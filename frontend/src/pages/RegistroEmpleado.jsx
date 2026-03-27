@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FiSliders } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
-import { apiUrl } from '../config/api';
+import { apiUrl, setAuthToken } from '../config/api';
 import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 import useSmartBack from '../hooks/useSmartBack';
 
@@ -45,6 +45,13 @@ function RegistroEmpleado() {
   const navigateBase = useNavigate();
   const smartBack = useSmartBack('/dashboard');
   const hasUnsavedChangesRef = useRef(false);
+  const forzarReingreso = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    setAuthToken(null);
+    toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'empleados-auth' });
+    navigateBase('/', { replace: true });
+  }, [navigateBase]);
   const navigate = useCallback((to, options) => {
     if (hasUnsavedChangesRef.current && !window.confirm('Tienes cambios sin guardar en el formulario de empleado. ¿Seguro que deseas salir?')) return;
     navigateBase(to, options);
@@ -59,10 +66,15 @@ function RegistroEmpleado() {
     try {
       const { data } = await axios.get(apiUrl('/api/usuarios'));
       setUsuarios(data);
-    } catch {
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       toast.error('No fue posible cargar empleados');
     }
-  }, []);
+  }, [forzarReingreso]);
 
   useEffect(() => {
     if (usuarioActual?.rol !== 'admin') {
@@ -174,6 +186,11 @@ function RegistroEmpleado() {
       cerrarFormulario(true);
       cargarUsuarios();
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       const mensaje = error.response?.data?.message || 'No fue posible guardar';
       toast.error(mensaje);
     } finally {
@@ -238,7 +255,12 @@ function RegistroEmpleado() {
       toast.success('Empleado eliminado');
       if (editandoId === usuario.id) limpiarFormulario();
       cargarUsuarios();
-    } catch {
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+        return;
+      }
       toast.error('No fue posible eliminar');
     }
   };

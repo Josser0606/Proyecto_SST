@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { FiBarChart2, FiCheckCircle, FiEye, FiFile, FiFileText, FiHeart, FiImage, FiLink2, FiMapPin, FiMonitor, FiPaperclip, FiRefreshCw, FiThumbsUp, FiType, FiUpload, FiX, FiZap } from 'react-icons/fi';
 import logoSaciar from '../assets/logo_saciar.png';
-import { apiUrl } from '../config/api';
+import { apiUrl, setAuthToken } from '../config/api';
 import useUnsavedChangesPrompt from '../hooks/useUnsavedChangesPrompt';
 import useSmartBack from '../hooks/useSmartBack';
 
@@ -100,6 +100,13 @@ function AdminPanel() {
     if (!confirmIfNeeded()) return;
     navigateBase(to, options);
   }, [confirmIfNeeded, navigateBase]);
+  const forzarReingreso = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('usuario');
+    setAuthToken(null);
+    toast.error('Sesion invalida. Ingresa nuevamente.', { id: 'admin-auth' });
+    navigateBase('/', { replace: true });
+  }, [navigateBase]);
   const goBack = useCallback(() => {
     if (!confirmIfNeeded()) return;
     smartBack();
@@ -281,8 +288,13 @@ function AdminPanel() {
       });
       toast.success('Comunicado publicado con exito');
       navigate('/dashboard');
-    } catch {
-      toast.error('Error al publicar');
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        forzarReingreso();
+      } else {
+        toast.error('Error al publicar');
+      }
     } finally {
       setLoading(false);
     }
