@@ -492,6 +492,22 @@ function Dashboard() {
     return pieces.pop().toLowerCase();
   };
 
+  const isPublicPreviewUrl = (value = '') => {
+    try {
+      const parsed = new URL(String(value || ''));
+      const host = parsed.hostname.toLowerCase();
+
+      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return false;
+      if (/^10\./.test(host)) return false;
+      if (/^192\.168\./.test(host)) return false;
+      if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return false;
+
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const resolverModoPreview = (url, tipo = '', nombre = '') => {
     const ext = getExtension(nombre) || getExtension(url);
     const isHttp = /^https?:\/\//i.test(String(url || ''));
@@ -499,7 +515,7 @@ function Dashboard() {
 
     if (tipo === 'archivo') {
       if (ext === 'pdf') return 'pdf';
-      if (officeExt.includes(ext) && isHttp) return 'office';
+      if (officeExt.includes(ext) && isHttp && isPublicPreviewUrl(url)) return 'office';
       return 'externo';
     }
     if (isHttp) return 'iframe';
@@ -1869,11 +1885,16 @@ function Dashboard() {
               )}
 
               {previewRecurso.modo === 'office' && (
-                <iframe
-                  title={`preview-office-${previewRecurso.nombre}`}
-                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewRecurso.url)}`}
-                  className="w-full h-full"
-                />
+                <div className="w-full h-full flex flex-col">
+                  <div className={`px-4 py-3 text-xs font-semibold border-b ${darkMode ? 'border-slate-800 bg-slate-900 text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
+                    La vista previa de Office depende de un servicio externo y puede tardar unos segundos. Si no carga, usa "Abrir afuera".
+                  </div>
+                  <iframe
+                    title={`preview-office-${previewRecurso.nombre}`}
+                    src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewRecurso.url)}`}
+                    className="w-full h-full"
+                  />
+                </div>
               )}
 
               {previewRecurso.modo === 'iframe' && (

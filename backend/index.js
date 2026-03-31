@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
@@ -38,6 +39,19 @@ const useCloudinary = Boolean(
   (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
 );
 const cloudinaryFolder = process.env.CLOUDINARY_FOLDER || 'saciar';
+const r2AccountId = String(process.env.R2_ACCOUNT_ID || '').trim();
+const r2AccessKeyId = String(process.env.R2_ACCESS_KEY_ID || '').trim();
+const r2SecretAccessKey = String(process.env.R2_SECRET_ACCESS_KEY || '').trim();
+const r2Bucket = String(process.env.R2_BUCKET || '').trim();
+const r2PublicBaseUrl = String(process.env.R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+const r2AttachmentsPrefix = String(process.env.R2_ATTACHMENTS_PREFIX || 'comunicados').trim().replace(/^\/+|\/+$/g, '');
+const useR2ForAttachments = Boolean(
+  r2AccountId &&
+  r2AccessKeyId &&
+  r2SecretAccessKey &&
+  r2Bucket &&
+  r2PublicBaseUrl
+);
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
 const authHeaderName = process.env.AUTH_HEADER_NAME || 'authorization';
@@ -98,7 +112,19 @@ if (useCloudinary) {
   }
 }
 
+const r2Client = useR2ForAttachments
+  ? new S3Client({
+    region: 'auto',
+    endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: r2AccessKeyId,
+      secretAccessKey: r2SecretAccessKey
+    }
+  })
+  : null;
+
 console.log(`Cloudinary enabled: ${useCloudinary} (auth: ${cloudinaryAuthMode}, folder: ${cloudinaryFolder})`);
+console.log(`Cloudflare R2 attachments enabled: ${useR2ForAttachments} (bucket: ${r2Bucket || 'n/a'})`);
 app.set('trust proxy', trustProxySetting);
 
 app.use(cors({
@@ -147,7 +173,14 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res) => {
+    // Permite incrustar PDFs y otros adjuntos en la vista previa del frontend.
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  }
+}));
 app.use('/api', apiLimiter);
 
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -470,6 +503,26 @@ const getCloudinaryPublicId = (url) => {
   }
 };
 
+const normalizeR2Key = (value) => String(value || '').replace(/^\/+/, '');
+
+const buildR2ObjectKey = (fileName) => {
+  const parts = [r2AttachmentsPrefix, fileName].filter(Boolean);
+  return normalizeR2Key(parts.join('/'));
+};
+
+const buildR2PublicUrl = (key) => {
+  if (!r2PublicBaseUrl) return '';
+  return `${r2PublicBaseUrl}/${normalizeR2Key(key)}`;
+};
+
+const getR2ObjectKeyFromUrl = (fileUrl) => {
+  const normalizedBase = r2PublicBaseUrl.replace(/\/+$/, '');
+  const normalizedUrl = String(fileUrl || '').trim();
+
+  if (!normalizedBase || !normalizedUrl.startsWith(normalizedBase)) return null;
+  return normalizeR2Key(normalizedUrl.slice(normalizedBase.length));
+};
+
 const deleteFileSafe = async (fileUrl) => {
   if (!fileUrl || typeof fileUrl !== 'string') return;
 
@@ -485,6 +538,21 @@ const deleteFileSafe = async (fileUrl) => {
     return;
   }
 
+  if (useR2ForAttachments) {
+    const objectKey = getR2ObjectKeyFromUrl(fileUrl);
+    if (objectKey) {
+      try {
+        await r2Client.send(new DeleteObjectCommand({
+          Bucket: r2Bucket,
+          Key: objectKey
+        }));
+      } catch {
+        // ignore R2 delete errors
+      }
+      return;
+    }
+  }
+
   if (useCloudinary && isCloudinaryUrl(fileUrl)) {
     const publicId = getCloudinaryPublicId(fileUrl);
     if (!publicId) return;
@@ -498,7 +566,31 @@ const deleteFileSafe = async (fileUrl) => {
 
 const uploadStoredFile = async (file, tipo) => {
   if (!file) return null;
-  if (!useCloudinary) {
+  if (tipo === 'archivo' && useR2ForAttachments) {
+    const objectKey = buildR2ObjectKey(file.filename);
+
+    try {
+      await r2Client.send(new PutObjectCommand({
+        Bucket: r2Bucket,
+        Key: objectKey,
+        Body: fs.createReadStream(file.path),
+        ContentType: file.mimetype || 'application/octet-stream',
+        ContentDisposition: `inline; filename="${encodeURIComponent(file.originalname || file.filename)}"`
+      }));
+    } finally {
+      if (file.path && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch {
+          // ignore local cleanup errors
+        }
+      }
+    }
+
+    return { url: buildR2PublicUrl(objectKey) };
+  }
+
+  if (tipo === 'archivo' || !useCloudinary) {
     return { url: `/uploads/${file.filename}` };
   }
 
