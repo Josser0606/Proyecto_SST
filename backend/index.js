@@ -74,14 +74,22 @@ const cloudinaryAuthMode = process.env.CLOUDINARY_URL
     ? 'keys'
     : 'none';
 const emailNotificationsEnabled = process.env.EMAIL_NOTIFICATIONS_ENABLED !== 'false';
+const smtpProvider = String(process.env.SMTP_PROVIDER || '').trim().toLowerCase();
+const isResendSmtp = smtpProvider === 'resend';
+const smtpHost = String(process.env.SMTP_HOST || (isResendSmtp ? 'smtp.resend.com' : '')).trim();
+const smtpPort = Number(process.env.SMTP_PORT || (isResendSmtp ? 465 : 0));
+const smtpUser = String(process.env.SMTP_USER || (isResendSmtp ? 'resend' : '')).trim();
+const smtpPass = String(process.env.SMTP_PASS || (isResendSmtp ? process.env.RESEND_API_KEY || '' : '')).trim();
 const smtpConfigured = Boolean(
-  process.env.SMTP_HOST &&
-  process.env.SMTP_PORT &&
-  process.env.SMTP_USER &&
-  process.env.SMTP_PASS &&
+  smtpHost &&
+  smtpPort &&
+  smtpUser &&
+  smtpPass &&
   process.env.SMTP_FROM_EMAIL
 );
-const smtpSecure = process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465;
+const smtpSecure = process.env.SMTP_SECURE
+  ? process.env.SMTP_SECURE === 'true'
+  : smtpPort === 465 || smtpPort === 2465;
 const emailQueueBatchSize = Math.min(Math.max(Number(process.env.EMAIL_QUEUE_BATCH_SIZE || 15), 1), 100);
 const emailMaxAttempts = Math.min(Math.max(Number(process.env.EMAIL_MAX_ATTEMPTS || 5), 1), 20);
 const emailRetryMinutes = Math.min(Math.max(Number(process.env.EMAIL_RETRY_MINUTES || 10), 1), 1440);
@@ -92,12 +100,12 @@ const emailFromAddress = process.env.SMTP_FROM_EMAIL || '';
 
 const emailTransporter = smtpConfigured
   ? nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
+    host: smtpHost,
+    port: smtpPort,
     secure: smtpSecure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
+      user: smtpUser,
+      pass: smtpPass
     }
   })
   : null;
@@ -131,6 +139,7 @@ const r2Client = useR2ForAttachments
 
 console.log(`Cloudinary enabled: ${useCloudinary} (auth: ${cloudinaryAuthMode}, folder: ${cloudinaryFolder})`);
 console.log(`Cloudflare R2 attachments enabled: ${useR2ForAttachments} (bucket: ${r2Bucket || 'n/a'})`);
+console.log(`SMTP provider: ${smtpProvider || 'custom'} (configured: ${smtpConfigured})`);
 app.set('trust proxy', trustProxySetting);
 
 app.use(cors({
