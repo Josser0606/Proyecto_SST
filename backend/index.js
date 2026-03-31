@@ -5,7 +5,6 @@ const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/cl
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
-const { v2: cloudinary } = require('cloudinary');
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
@@ -15,6 +14,13 @@ const db = require('./db');
 const iniciarTareas = require('./tareas');
 
 const app = express();
+const rawCloudinaryUrl = String(process.env.CLOUDINARY_URL || '').trim();
+const hasValidCloudinaryUrl = !rawCloudinaryUrl || rawCloudinaryUrl.startsWith('cloudinary://');
+if (rawCloudinaryUrl && !hasValidCloudinaryUrl) {
+  console.warn('Ignoring invalid CLOUDINARY_URL. Expected format: cloudinary://<api_key>:<api_secret>@<cloud_name>');
+  delete process.env.CLOUDINARY_URL;
+}
+const { v2: cloudinary } = require('cloudinary');
 const PORT = process.env.PORT || 3000;
 const trustProxySetting = process.env.TRUST_PROXY || (process.env.NODE_ENV === 'production' ? '1' : '0');
 const allowedOrigins = (process.env.FRONTEND_URLS || process.env.FRONTEND_URL || 'http://localhost:5173')
