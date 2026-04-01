@@ -522,6 +522,14 @@ function Dashboard() {
     return 'externo';
   };
 
+  const getExternalPreviewUrl = (url, modo) => {
+    if (!url) return '';
+    if (modo === 'office') {
+      return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
+
   const abrirRecurso = (recurso) => {
     const url = recurso?.tipo === 'archivo' ? assetUrl(recurso.url) : recurso?.url;
     if (!url) return;
@@ -1857,7 +1865,7 @@ function Dashboard() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.open(previewRecurso.url, '_blank', 'noopener,noreferrer')}
+                  onClick={() => window.open(getExternalPreviewUrl(previewRecurso.url, previewRecurso.modo), '_blank', 'noopener,noreferrer')}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-black ${
                     darkMode ? 'border-slate-700 bg-slate-800 text-slate-200 hover:border-green-500 hover:text-green-300' : 'border-slate-200 bg-white text-slate-700 hover:border-green-300 hover:text-green-700'
                   }`}
