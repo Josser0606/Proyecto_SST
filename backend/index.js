@@ -583,6 +583,7 @@ const uploadStoredFile = async (file, tipo) => {
   if (!file) return null;
   if (tipo === 'archivo' && useR2ForAttachments) {
     const objectKey = buildR2ObjectKey(file.filename);
+    console.log(`Uploading attachment to R2: ${objectKey}`);
 
     try {
       await r2Client.send(new PutObjectCommand({
@@ -602,10 +603,14 @@ const uploadStoredFile = async (file, tipo) => {
       }
     }
 
+    console.log(`Attachment stored in R2: ${buildR2PublicUrl(objectKey)}`);
     return { url: buildR2PublicUrl(objectKey) };
   }
 
   if (tipo === 'archivo' || !useCloudinary) {
+    if (tipo === 'archivo') {
+      console.warn(`Attachment stored locally (R2 disabled or not configured): /uploads/${file.filename}`);
+    }
     return { url: `/uploads/${file.filename}` };
   }
 
